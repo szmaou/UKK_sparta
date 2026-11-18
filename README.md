@@ -12,8 +12,11 @@ perlindungan stok serta histori transaksi. Akun dinonaktifkan tanpa menghapus
 histori; Admin tidak dapat menonaktifkan atau mengganti role akunnya sendiri.
 Peminjam dapat mencari katalog, mengajukan peminjaman, dan melihat riwayat sendiri.
 Petugas dapat menyetujui atau menolak pengajuan. Stok dikurangi dalam transaksi
-saat persetujuan, bukan saat pengajuan. CRUD administratif transaksi,
-pengembalian, dan laporan belum tersedia. Dashboard tidak menampilkan angka fiktif.
+saat persetujuan, bukan saat pengajuan. Peminjam dapat mengajukan pengembalian;
+Petugas memantau dan memverifikasi penerimaan sebelum stok dipulihkan tepat sekali.
+Hari keterlambatan dihitung dengan tarif denda bawaan Rp0. Kondisi alat dicatat,
+tetapi penghapusan aset rusak/hilang belum termasuk MVP. CRUD administratif
+transaksi dan laporan belum tersedia. Dashboard tidak menampilkan angka fiktif.
 
 ## Requirement
 
@@ -101,6 +104,7 @@ php tests/http_auth_test.php
 php tests/http_master_data_test.php
 php tests/http_users_test.php
 php tests/http_loans_test.php
+php tests/http_returns_test.php
 ```
 
 Uji HTTP membutuhkan `curl` dan menjalankan development server sementara sendiri.
