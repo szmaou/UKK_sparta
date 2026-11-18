@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/autoload.php';
 
+// Return dates and deadlines are compared in the school's local timezone.
+date_default_timezone_set('Asia/Jakarta');
+
 /**
  * Full application container: PDO (from bootstrap/app.php), services, controllers
  * and the route table. Used by public/index.php and the HTTP integration test.
@@ -20,6 +23,7 @@ $logs = new App\Models\ActivityLog($container['db']);
 $alatModel = new App\Models\Alat($container['db'], $logs, new App\Models\Kategori($container['db'], $logs));
 $loans = new App\Models\Peminjaman($container['db'], $logs);
 $peminjamanService = new App\Services\PeminjamanService($alatModel, $loans);
+$returns = new App\Models\Pengembalian($container['db']);
 
 $app = [
     'db' => $container['db'],
@@ -71,6 +75,13 @@ $app = [
         $view,
         $loans,
         $peminjamanService
+    ),
+    'pengembalianController' => new App\Controllers\PengembalianController(
+        $auth,
+        $session,
+        $view,
+        $returns,
+        new App\Services\PengembalianService()
     ),
 ];
 

@@ -37,6 +37,13 @@ $router->get('/petugas/persetujuan', [$app['approvalController'], 'index'], ['pe
 $router->post('/petugas/peminjaman/{id}/approve', [$app['approvalController'], 'approve'], ['petugas']);
 $router->post('/petugas/peminjaman/{id}/reject', [$app['approvalController'], 'reject'], ['petugas']);
 
+// Returns: borrower request (FR-14) and Petugas reception monitoring (FR-10).
+$router->get('/peminjam/pengembalian', [$app['pengembalianController'], 'index'], ['peminjam']);
+$router->post('/peminjam/peminjaman/{id}/return', [$app['pengembalianController'], 'requestReturn'], ['peminjam']);
+$router->get('/petugas/pengembalian', [$app['pengembalianController'], 'monitoring'], ['petugas']);
+$router->get('/petugas/pengembalian/{id}/verify', [$app['pengembalianController'], 'verifyForm'], ['petugas']);
+$router->post('/petugas/pengembalian/{id}/verify', [$app['pengembalianController'], 'verifyStore'], ['petugas']);
+
 // Admin master data: kategori, alat and users (FR-03, FR-04, FR-05). POST
 // routes carry CSRF through the front controller.
 foreach (['kategori', 'alat', 'users'] as $module) {
