@@ -6,9 +6,11 @@ Baseline kebutuhan: [`docs/PRD-SPARTA.md`](docs/PRD-SPARTA.md).
 ## Status implementasi
 
 Tersedia: schema MariaDB, SQL routines, seed demo, fondasi PHP MVC, login/logout,
-CSRF, pemeriksaan role, dashboard dasar, serta CRUD kategori dan alat untuk Admin.
-Master data mendukung pencarian, pagination, audit perubahan, dan perlindungan
-stok serta histori transaksi. CRUD pengguna dan transaksi, alur peminjaman,
+CSRF, pemeriksaan role, dashboard dasar, serta CRUD pengguna, kategori, dan alat
+untuk Admin. Master data mendukung pencarian, pagination, audit perubahan, dan
+perlindungan stok serta histori transaksi. Akun dinonaktifkan tanpa menghapus
+histori; Admin tidak dapat menonaktifkan atau mengganti role akunnya sendiri.
+CRUD transaksi, alur peminjaman,
 persetujuan, pengembalian, dan laporan belum tersedia. Dashboard tidak menampilkan
 angka fiktif.
 
@@ -96,6 +98,7 @@ php tests/security_test.php
 php tests/database/schema_test.php
 php tests/http_auth_test.php
 php tests/http_master_data_test.php
+php tests/http_users_test.php
 ```
 
 Uji HTTP membutuhkan `curl` dan menjalankan development server sementara sendiri.
