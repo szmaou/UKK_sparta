@@ -1,0 +1,20 @@
+# Apache fallback when the document root cannot be moved to public/.
+# Front controller plus static assets only; private directories stay unreachable.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Block private source/config files even if the docroot is the project root.
+    RewriteRule ^(app|bootstrap|config|database|docs|resources|tests|sql|design|vendor)(/|$) - [F,L]
+    RewriteRule (^|/)\. - [F,L]
+
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+<FilesMatch "\.(env|sql|md|log|lock|json)$">
+    Require all denied
+</FilesMatch>
+
+Options -Indexes
