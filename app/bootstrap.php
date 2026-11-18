@@ -13,7 +13,8 @@ require_once __DIR__ . '/autoload.php';
 $container = require dirname(__DIR__) . '/bootstrap/app.php';
 
 $session = new App\Core\Session();
-$auth = new App\Services\Auth($session, new App\Models\User($container['db']));
+$users = new App\Models\User($container['db'], new App\Models\ActivityLog($container['db']));
+$auth = new App\Services\Auth($session, $users);
 $view = new App\Core\View(__DIR__ . '/Views');
 
 $app = [
@@ -35,6 +36,7 @@ $app = [
         $view,
         new App\Models\Kategori($container['db'], new App\Models\ActivityLog($container['db']))
     ),
+    'usersController' => new App\Controllers\UserController($auth, $session, $view, $users),
     'alatController' => new App\Controllers\AlatController(
         $auth,
         $session,
