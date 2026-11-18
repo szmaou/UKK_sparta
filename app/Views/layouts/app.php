@@ -10,6 +10,7 @@ $name = (string) ($user['name'] ?? $user['username'] ?? 'Pengguna');
 $username = (string) ($user['username'] ?? '');
 $pageTitle = (string) ($pageTitle ?? 'Dashboard');
 $activeNav = (string) ($activeNav ?? match (true) {
+    str_contains(strtolower($pageTitle), 'pengguna') => 'pengguna',
     str_contains(strtolower($pageTitle), 'kategori') => 'kategori',
     str_contains(strtolower($pageTitle), 'alat') => 'alat',
     default => 'dashboard',
@@ -18,7 +19,7 @@ $activeNav = (string) ($activeNav ?? match (true) {
 $menus = [
     'admin' => [
         ['layout-dashboard', 'Dashboard', '/admin/dashboard', 'dashboard'],
-        ['users', 'Pengguna', null, 'pengguna'],
+        ['users', 'Pengguna', '/admin/users', 'pengguna'],
         ['tags', 'Kategori', '/admin/kategori', 'kategori'],
         ['wrench', 'Alat', '/admin/alat', 'alat'],
         ['clipboard-list', 'Peminjaman', null, 'peminjaman'],

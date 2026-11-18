@@ -61,7 +61,7 @@ ob_start();
                                 <span class="app-icon text-slate-500" aria-hidden="true"><?= icon('wrench') ?></span>
                                 <span class="truncate font-semibold"><?= e($module) ?></span>
                             </div>
-                            <?php $moduleReady = $currentRole === 'admin' && $module === 'Kategori & alat'; ?>
+                            <?php $moduleReady = $currentRole === 'admin' && in_array($module, ['Pengguna', 'Kategori & alat'], true); ?>
                             <span class="badge badge-sm whitespace-nowrap <?= $moduleReady ? 'border-green-200 bg-green-50 text-green-800' : 'badge-ghost' ?>"><?= $moduleReady ? 'Tersedia' : 'Belum tersedia' ?></span>
                         </div>
                     <?php endforeach; ?>

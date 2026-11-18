@@ -1,5 +1,6 @@
 .codegraph/
 /node_modules/
+/.playwright-mcp/
 /.env
 /config/database.local.php
 
