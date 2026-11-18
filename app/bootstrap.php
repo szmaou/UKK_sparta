@@ -16,6 +16,10 @@ $session = new App\Core\Session();
 $users = new App\Models\User($container['db'], new App\Models\ActivityLog($container['db']));
 $auth = new App\Services\Auth($session, $users);
 $view = new App\Core\View(__DIR__ . '/Views');
+$logs = new App\Models\ActivityLog($container['db']);
+$alatModel = new App\Models\Alat($container['db'], $logs, new App\Models\Kategori($container['db'], $logs));
+$loans = new App\Models\Peminjaman($container['db'], $logs);
+$peminjamanService = new App\Services\PeminjamanService($alatModel, $loans);
 
 $app = [
     'db' => $container['db'],
@@ -46,6 +50,27 @@ $app = [
             new App\Models\ActivityLog($container['db']),
             new App\Models\Kategori($container['db'], new App\Models\ActivityLog($container['db']))
         )
+    ),
+    'katalogController' => new App\Controllers\KatalogController(
+        $auth,
+        $session,
+        $view,
+        $alatModel
+    ),
+    'peminjamanController' => new App\Controllers\PeminjamanController(
+        $auth,
+        $session,
+        $view,
+        $alatModel,
+        $loans,
+        $peminjamanService
+    ),
+    'approvalController' => new App\Controllers\ApprovalController(
+        $auth,
+        $session,
+        $view,
+        $loans,
+        $peminjamanService
     ),
 ];
 

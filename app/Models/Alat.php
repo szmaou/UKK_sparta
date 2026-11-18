@@ -102,6 +102,51 @@ final class Alat
             'totalPages' => max(1, (int) ceil($total / self::PER_PAGE)),
         ];
     }
+    /**
+     * Active-tool catalog for borrowers (FR-12). Search covers kode/nama and an
+     * optional category filter; pagination matches the admin list.
+     *
+     * @return array{items: list<array<string, mixed>>, total: int, totalPages: int}
+     */
+    public function catalog(string $q, ?int $kategoriId, int $page): array
+    {
+        $page = max(1, $page);
+        $q = mb_substr(trim($q), 0, 100);
+        $where = ['a.is_active = 1'];
+        $params = [];
+        if ($q !== '') {
+            $where[] = '(a.kode LIKE :qk OR a.nama LIKE :qn)';
+            $params[':qk'] = '%' . $q . '%';
+            $params[':qn'] = '%' . $q . '%';
+        }
+        if ($kategoriId !== null) {
+            $where[] = 'a.kategori_id = :kategori_id';
+            $params[':kategori_id'] = $kategoriId;
+        }
+        $sql = ' FROM alat a JOIN kategori k ON k.id = a.kategori_id WHERE ' . implode(' AND ', $where);
+        $count = $this->db->prepare('SELECT COUNT(*)' . $sql);
+        foreach ($params as $key => $value) {
+            $count->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $count->execute();
+        $total = (int) $count->fetchColumn();
+        $stmt = $this->db->prepare(
+            'SELECT a.id, a.kode, a.nama, k.nama AS kategori_nama, a.deskripsi, a.stok_tersedia'
+            . $sql . ' ORDER BY a.nama, a.id LIMIT :limit OFFSET :offset'
+        );
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->bindValue(':limit', self::PER_PAGE, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', ($page - 1) * self::PER_PAGE, PDO::PARAM_INT);
+        $stmt->execute();
+        return [
+            'items' => array_values($stmt->fetchAll()),
+            'total' => $total,
+            'totalPages' => max(1, (int) ceil($total / self::PER_PAGE)),
+        ];
+    }
+
     /** @return array<string, mixed>|null */
     public function find(int $id): ?array
     {

@@ -27,6 +27,16 @@ foreach ($roles as $role) {
     );
 }
 
+// Borrower catalog, loan requests and own history (FR-12, FR-13).
+$router->get('/peminjam/alat', [$app['katalogController'], 'index'], ['peminjam']);
+$router->get('/peminjam/peminjaman', [$app['peminjamanController'], 'index'], ['peminjam']);
+$router->get('/peminjam/peminjaman/create', [$app['peminjamanController'], 'create'], ['peminjam']);
+$router->post('/peminjam/peminjaman/create', [$app['peminjamanController'], 'store'], ['peminjam']);
+// Petugas approval queue (FR-09).
+$router->get('/petugas/persetujuan', [$app['approvalController'], 'index'], ['petugas']);
+$router->post('/petugas/peminjaman/{id}/approve', [$app['approvalController'], 'approve'], ['petugas']);
+$router->post('/petugas/peminjaman/{id}/reject', [$app['approvalController'], 'reject'], ['petugas']);
+
 // Admin master data: kategori, alat and users (FR-03, FR-04, FR-05). POST
 // routes carry CSRF through the front controller.
 foreach (['kategori', 'alat', 'users'] as $module) {
