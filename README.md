@@ -5,9 +5,12 @@ Baseline kebutuhan: [`docs/PRD-SPARTA.md`](docs/PRD-SPARTA.md).
 
 ## Status implementasi
 
-Tahap 1: schema MariaDB, SQL routines, seed demo, fondasi PHP MVC, login/logout,
-CSRF, pemeriksaan role, dan dashboard dasar. CRUD, peminjaman, persetujuan,
-pengembalian, dan laporan belum tersedia. Dashboard tidak menampilkan angka fiktif.
+Tersedia: schema MariaDB, SQL routines, seed demo, fondasi PHP MVC, login/logout,
+CSRF, pemeriksaan role, dashboard dasar, serta CRUD kategori dan alat untuk Admin.
+Master data mendukung pencarian, pagination, audit perubahan, dan perlindungan
+stok serta histori transaksi. CRUD pengguna dan transaksi, alur peminjaman,
+persetujuan, pengembalian, dan laporan belum tersedia. Dashboard tidak menampilkan
+angka fiktif.
 
 ## Requirement
 
@@ -63,13 +66,12 @@ ke `public/` agar konfigurasi, SQL, dan source privat tidak dapat diunduh lewat 
 
 ## Akun demo lokal
 
-| Role | Username | Password |
-|---|---|---|
-| Admin | `admin` | `admin123` |
-| Petugas | `petugas` | `petugas123` |
+| Role     | Username   | Password      |
+| -------- | ---------- | ------------- |
+| Admin    | `admin`    | `admin123`    |
+| Petugas  | `petugas`  | `petugas123`  |
 | Peminjam | `peminjam` | `peminjam123` |
 
-**Hanya untuk demo lokal. Jangan jalankan seeder ini pada database produksi.**
 Seeder tidak mengganti akun yang sudah ada. Detail database dan pemeriksaan
 integritas tersedia pada [`database/README.md`](database/README.md).
 
@@ -89,9 +91,11 @@ serta menghapus akun fixture bernama `it_*`; uji database menggunakan fixture
 transaksional dan memeriksa seed demo.
 
 ```sh
+php tests/database_config_test.php
 php tests/security_test.php
 php tests/database/schema_test.php
 php tests/http_auth_test.php
+php tests/http_master_data_test.php
 ```
 
 Uji HTTP membutuhkan `curl` dan menjalankan development server sementara sendiri.
