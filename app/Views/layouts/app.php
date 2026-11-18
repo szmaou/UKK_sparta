@@ -13,6 +13,9 @@ $activeNav = (string) ($activeNav ?? match (true) {
     str_contains(strtolower($pageTitle), 'pengguna') => 'pengguna',
     str_contains(strtolower($pageTitle), 'kategori') => 'kategori',
     str_contains(strtolower($pageTitle), 'alat') => 'alat',
+    str_contains(strtolower($pageTitle), 'persetujuan') => 'persetujuan',
+    str_contains(strtolower($pageTitle), 'katalog') => 'katalog',
+    str_contains(strtolower($pageTitle), 'peminjaman') => 'peminjaman',
     default => 'dashboard',
 });
 
@@ -28,14 +31,14 @@ $menus = [
     ],
     'petugas' => [
         ['layout-dashboard', 'Dashboard', '/petugas/dashboard', 'dashboard'],
-        ['square-check', 'Persetujuan', null, 'persetujuan'],
+        ['square-check', 'Persetujuan', '/petugas/persetujuan', 'persetujuan'],
         ['refresh-cw', 'Pengembalian', null, 'pengembalian'],
         ['file-text', 'Laporan', null, 'laporan'],
     ],
     'peminjam' => [
         ['layout-dashboard', 'Dashboard', '/peminjam/dashboard', 'dashboard'],
-        ['search', 'Katalog Alat', null, 'katalog'],
-        ['clipboard-list', 'Peminjaman Saya', null, 'peminjaman'],
+        ['search', 'Katalog Alat', '/peminjam/alat', 'katalog'],
+        ['clipboard-list', 'Peminjaman Saya', '/peminjam/peminjaman', 'peminjaman'],
         ['refresh-cw', 'Pengembalian', null, 'pengembalian'],
     ],
 ];
