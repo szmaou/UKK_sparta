@@ -20,7 +20,7 @@ $roleCopy = [
         'intro' => 'Tinjau alur peminjaman dan pengembalian dengan jelas.',
         'icon' => 'square-check',
         'title' => 'Ruang kerja Petugas',
-        'body' => 'Modul persetujuan, pemantauan pengembalian, dan laporan sedang disiapkan.',
+        'body' => 'Kelola persetujuan peminjaman dan verifikasi fisik pengembalian barang.',
         'modules' => ['Persetujuan', 'Pengembalian', 'Laporan'],
     ],
     'peminjam' => [
@@ -28,7 +28,7 @@ $roleCopy = [
         'intro' => 'Temukan alat sekolah dan pantau pengajuan Anda.',
         'icon' => 'search',
         'title' => 'Ruang pinjam Anda',
-        'body' => 'Katalog, pengajuan, dan pengembalian alat sedang disiapkan.',
+        'body' => 'Jelajahi katalog alat, pantau riwayat pinjam, dan ajukan pengembalian tepat waktu.',
         'modules' => ['Katalog alat', 'Peminjaman saya', 'Pengembalian'],
     ],
 ];
@@ -63,8 +63,8 @@ ob_start();
                             </div>
                             <?php
                             $moduleReady = ($currentRole === 'admin' && in_array($module, ['Pengguna', 'Kategori & alat'], true))
-                                || ($currentRole === 'petugas' && in_array($module, ['Persetujuan'], true))
-                                || ($currentRole === 'peminjam' && in_array($module, ['Katalog alat', 'Peminjaman saya'], true));
+                                || ($currentRole === 'petugas' && in_array($module, ['Persetujuan', 'Pengembalian'], true))
+                                || ($currentRole === 'peminjam' && in_array($module, ['Katalog alat', 'Peminjaman saya', 'Pengembalian'], true));
                             ?>
                             <span class="badge badge-sm whitespace-nowrap <?= $moduleReady ? 'border-green-200 bg-green-50 text-green-800' : 'badge-ghost' ?>"><?= $moduleReady ? 'Tersedia' : 'Belum tersedia' ?></span>
                         </div>

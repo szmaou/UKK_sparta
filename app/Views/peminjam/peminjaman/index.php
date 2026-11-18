@@ -23,6 +23,7 @@ $statusBadge = static function (string $status): array {
         'approved' => ['Disetujui', 'border-emerald-200 bg-emerald-50 text-emerald-800'],
         'rejected' => ['Ditolak', 'border-rose-200 bg-rose-50 text-rose-800'],
         'borrowed' => ['Sedang Dipinjam', 'border-blue-200 bg-blue-50 text-blue-800'],
+        'return_requested' => ['Menunggu Verifikasi Kembali', 'border-sky-200 bg-sky-50 text-sky-800'],
         'returned' => ['Dikembalikan', 'border-slate-200 bg-slate-100 text-slate-700'],
         default => [ucfirst($status), 'badge-ghost'],
     };
