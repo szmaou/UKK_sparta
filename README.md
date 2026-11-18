@@ -1,0 +1,97 @@
+# SPARTA
+
+Sistem Peminjaman Barang & Alat untuk Admin, Petugas, dan Peminjam.
+Baseline kebutuhan: [`docs/PRD-SPARTA.md`](docs/PRD-SPARTA.md).
+
+## Status implementasi
+
+Tahap 1: schema MariaDB, SQL routines, seed demo, fondasi PHP MVC, login/logout,
+CSRF, pemeriksaan role, dan dashboard dasar. CRUD, peminjaman, persetujuan,
+pengembalian, dan laporan belum tersedia. Dashboard tidak menampilkan angka fiktif.
+
+## Requirement
+
+- PHP 8.2 atau lebih baru dengan PDO MySQL.
+- MariaDB dengan InnoDB dan dukungan `CHECK` constraint.
+- Node.js dan npm untuk build CSS lokal; tidak diperlukan untuk runtime PHP.
+- Document root harus menunjuk ke `public/`, bukan root repository.
+
+## Menjalankan lokal
+
+1. Buat database kosong dan user database khusus. Import schema dan routines dengan
+   akun yang memiliki izin yang sesuai:
+
+   ```sh
+   mariadb -u root -p -e 'CREATE DATABASE sparta CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;'
+   mariadb -u root -p sparta < database/schema.sql
+   mariadb -u root -p sparta < database/routines.sql
+   ```
+
+   Pembuatan user dan pemberian izin mengikuti konfigurasi MariaDB setempat.
+   Jangan gunakan akun root sebagai akun runtime aplikasi.
+
+2. Export konfigurasi koneksi pada shell yang akan menjalankan PHP:
+
+   ```sh
+   export DB_HOST=127.0.0.1
+   export DB_PORT=3306
+   export DB_NAME=sparta
+   export DB_USER=sparta
+   read -rsp 'DB password: ' DB_PASSWORD; echo
+   export DB_PASSWORD
+   ```
+
+   `.env.example` hanya referensi variabel. Aplikasi tidak memuat `.env` otomatis.
+
+3. Buat data demo, build CSS, lalu jalankan development server:
+
+   ```sh
+   php database/seeders/seed.php
+   npm ci
+   npm run build
+   php -S 127.0.0.1:8000 -t public public/router.php
+   ```
+
+4. Buka <http://127.0.0.1:8000/login>.
+
+Development server PHP bukan server produksi. Pada hosting, arahkan document root
+ke `public/` agar konfigurasi, SQL, dan source privat tidak dapat diunduh lewat URL.
+
+## Akun demo lokal
+
+| Role | Username | Password |
+|---|---|---|
+| Admin | `admin` | `admin123` |
+| Petugas | `petugas` | `petugas123` |
+| Peminjam | `peminjam` | `peminjam123` |
+
+**Hanya untuk demo lokal. Jangan jalankan seeder ini pada database produksi.**
+Seeder tidak mengganti akun yang sudah ada. Detail database dan pemeriksaan
+integritas tersedia pada [`database/README.md`](database/README.md).
+
+## Assets dan desain
+
+- Tailwind CSS dan daisyUI dikompilasi ke `public/assets/css/app.css`.
+- Icons memakai SVG [Lucide](https://lucide.dev) lokal pada
+  `public/assets/icons/lucide/`; license dan metadata disertakan.
+- Tidak ada ketergantungan CDN saat runtime.
+- `design/SPARTA.figcraft` merupakan sumber desain kanonik. Export JSON, modular
+  read view, screenshots, dan validation logs diabaikan Git.
+
+## Pengujian
+
+Gunakan **database pengujian khusus**, bukan database produksi. Uji HTTP membuat
+serta menghapus akun fixture bernama `it_*`; uji database menggunakan fixture
+transaksional dan memeriksa seed demo.
+
+```sh
+php tests/security_test.php
+php tests/database/schema_test.php
+php tests/http_auth_test.php
+```
+
+Uji HTTP membutuhkan `curl` dan menjalankan development server sementara sendiri.
+Exit status `2` pada uji integrasi berarti database tidak tersedia, bukan lulus.
+
+Konfigurasi koneksi memakai variabel `DB_*` yang sama. Status implementasi bukan
+bukti bahwa seluruh acceptance criteria PRD sudah terpenuhi.
