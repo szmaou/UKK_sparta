@@ -1,0 +1,79 @@
+SPARTA Core Design Focused Validation
+Date: 2026-11-17
+Scope: essential Peminjam and Admin transaction implementation-reference screens only. Existing files and frames preserved.
+
+1) Generator syntax
+Command: node --check design/generate_sparta.js
+Exit Status: 0
+Relevant output: (none)
+
+2) Coverage JSON syntax
+Command: node -e "JSON.parse(require('fs').readFileSync('design/coverage.json','utf8')); console.log('coverage JSON syntax OK')"
+Exit Status: 0
+Relevant output: coverage JSON syntax OK
+
+3) First full generation attempt
+Command: node /home/san/Documents/sparta/design/generate_sparta.js
+Exit Status: 143 (SIGTERM)
+Relevant output: Command timed out after 120 seconds while building Page 07.
+Resolution: reran unchanged command with 300000 ms validation timeout.
+
+4) Final generation, canonical conversion, assertions, and module export
+Command: node /home/san/Documents/sparta/design/generate_sparta.js
+Exit Status: 0
+Relevant output:
+✓ All Auth assertions passed (Email-only, Mobile single logo).
+✓ All Petugas assertions passed (handover, active return, monitoring, report preview, archive guardrail).
+✓ All core reference assertions passed (fields, action guards, fixture ownership).
+export OK: lossless reassembly deep-equal, refs resolve, canonical minified, Admin scope isolated
+{"frames":48,"pages":8,"nodes":24105,"blobCount":2941}
+
+5) Resolve generated IDs and update coverage totals
+Command: node - <<'NODE' ... resolve names from design/modules/index.json and write design/coverage.json ... NODE
+Exit Status: 0
+Relevant output:
+21190:Peminjam — Detail Alat ALT-001
+21756:Peminjam — Detail PJ-0004 Batalkan Pengajuan
+22326:Peminjam — Ajukan Pengembalian PJ-0001
+22895:Admin — Peminjaman Tambah
+23475:Admin — Peminjaman Edit PJ-0004
+24054:Admin — Koreksi Pengembalian PJ-0005
+
+6) Lossless module verification
+Command: node design/export-modules.js --verify
+Exit Status: 0
+Relevant output:
+verify OK: 8 pages, 48 frames, 24105 nodes, 2941 payload refs, 2941 blobs
+bytes: canonical json 64546507, modules 18133554
+
+7) Export affected Admin page
+Command: figcraft-cli export --automation-read-root /home/san/Documents/sparta --automation-write-root /home/san/Documents/sparta --page "04 — Admin CRUD" --out /home/san/Documents/sparta/design/screenshots/ /home/san/Documents/sparta/design/SPARTA.figcraft
+Exit Status: 0
+Relevant output: 16 Admin PNG files exported, including all three new Admin frames.
+
+8) Export affected Peminjam page
+Command: figcraft-cli export --automation-read-root /home/san/Documents/sparta --automation-write-root /home/san/Documents/sparta --page "06 — Peminjam Exp" --out /home/san/Documents/sparta/design/screenshots/ /home/san/Documents/sparta/design/SPARTA.figcraft
+Exit Status: 0
+Relevant output: 6 Peminjam PNG files exported, including all three new Peminjam frames.
+
+9) Focused module assertions
+Command: node - <<'NODE' ... verify old IDs, required UI copy/action guards, fixture owners, no internal fixture/demo/developer copy, remainingGaps, deferredOutOfScope ... NODE
+Exit Status: 0
+Relevant output:
+21190: Peminjam — Detail Alat ALT-001 OK
+21756: Peminjam — Detail PJ-0004 Batalkan Pengajuan OK
+22326: Peminjam — Ajukan Pengembalian PJ-0001 OK
+22895: Admin — Peminjaman Tambah OK
+23475: Admin — Peminjaman Edit PJ-0004 OK
+24054: Admin — Koreksi Pengembalian PJ-0005 OK
+existing IDs, action guards, owners, copy, coverage OK
+
+10) Visual inspection
+Inspected six final 1440 × 960 PNG renders.
+Result: PASS. No visible overlap, clipping, truncated controls, or out-of-frame content.
+
+Limits:
+- Design artifacts only; no PHP, database, authorization, stock mutation, or POST behavior tested.
+- No new responsive expansion. Existing responsive examples preserved.
+- Reusable components, safe modular editing, and full responsive variants remain deferred out of scope.
+- Parent owns docs/DESIGN-HANDOFF.md reconciliation and final combined validation.

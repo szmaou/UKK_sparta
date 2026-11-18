@@ -1,0 +1,89 @@
+SPARTA cleanup validation — 2026-11-17
+
+$ node --check design/generate_sparta.js
+EXIT:0
+
+$ node --check design/export-modules.js
+EXIT:0
+
+$ node [cleanup assertions against design/SPARTA.json]
+cleanup assertions OK { pages: 8, frames: 44, nodes: 23984, adminUsersChildren: 84 }
+EXIT:0
+
+$ node design/export-modules.js --verify
+verify OK: 8 pages, 44 frames, 23984 nodes, 2932 payload refs, 2932 blobs
+bytes: canonical json 64458192 (semantic 73fa813ee227801c7febf5ca2cd80430c1655ae27a406ebeb7f73436d01bd2c8), modules 18071541 (pages 336857, frames 11323272, blobs 6411412)
+EXIT:0
+
+$ node [retained frame comparison against /tmp/opencode/retained-baseline.json]
+1061->1061 Colors & Contrast Tokens (unchanged)
+1185->1149 Buttons & Action Controls
+1240->1204 Inputs & Form Controls
+1323->1229 Desktop Shell — Admin
+1962->1868 Desktop Shell — Petugas
+2587->2493 Desktop Shell — Peminjam
+3209->3115 Desktop Login — Default
+3760->3665 Desktop Login — Error State
+4314->4218 Desktop Login — Loading State
+4866->4769 Desktop Login — Disabled Account
+5421->5323 Mobile Login — Default
+5969->5871 Mobile Login — Error State
+6521->6423 Admin — Data Pengguna
+7158->7037 Admin — Kategori Alat
+7750->7629 Admin — Data Alat & Barang
+8358->8237 Admin — Log Aktivitas
+8951->8830 Admin — Pengguna Tambah
+9527->9406 Admin — Pengguna Edit
+10102->9981 Admin — Pengguna Detail
+10668->10547 Admin — Kategori Tambah
+11236->11115 Admin — Kategori Edit
+11804->11683 Admin — Alat Tambah
+12382->12261 Admin — Alat Edit
+12957->12836 Admin — Alat Detail
+13532->13411 Admin — Peminjaman & Pengembalian
+14141->14020 Petugas — Verifikasi Pengembalian & Denda
+14709->14588 Petugas — Laporan Sarpras A4 Print
+15304->15183 Petugas — Antrean Persetujuan
+15890->15769 Peminjam — Katalog Alat
+16469->16348 Peminjam — Form Pengajuan Pinjam
+16492->16371 Peminjam — Peminjaman Saya & Riwayat
+17077->16956 Mobile Shell — Drawer Closed (Admin)
+17632->17511 Mobile Shell — Drawer Open (Admin)
+18184->18063 Tablet Shell — Admin (768px)
+18782->18661 Petugas — Konfirmasi Serah Terima PJ-0003
+19362->19241 Petugas — Verifikasi Pengembalian Aktif PJ-0006
+19946->19825 Petugas — Monitoring Pengembalian
+20549->20428 Petugas — Filter & Preview Laporan
+21190->21069 Peminjam — Detail Alat ALT-001
+21756->21635 Peminjam — Detail PJ-0004 Batalkan Pengajuan
+22326->22205 Peminjam — Ajukan Pengembalian PJ-0001
+22895->22774 Admin — Peminjaman Tambah
+23475->23354 Admin — Peminjaman Edit PJ-0004
+24054->23933 Admin — Koreksi Pengembalian PJ-0005
+{"retained":44,"unchanged":1,"remapped":43,"missing":0}
+EXIT:0
+
+$ node [removed module/index/screenshot and stale active-ID assertions]
+stale assertions OK { pages: 8, frames: 44, nodes: 23984, blobs: 2932 }
+EXIT:0
+
+$ file 'design/screenshots/Admin — Data Pengguna.png' 'design/screenshots/Desktop Login — Default.png' 'design/screenshots/Desktop Login — Error State.png' 'design/screenshots/Buttons & Action Controls.png' 'design/screenshots/Inputs & Form Controls.png'
+design/screenshots/Admin — Data Pengguna.png:       PNG image data, 1440 x 960, 8-bit/color RGBA, non-interlaced
+design/screenshots/Desktop Login — Default.png:     PNG image data, 1440 x 900, 8-bit/color RGBA, non-interlaced
+design/screenshots/Desktop Login — Error State.png: PNG image data, 1440 x 900, 8-bit/color RGBA, non-interlaced
+design/screenshots/Buttons & Action Controls.png:   PNG image data, 1000 x 550, 8-bit/color RGBA, non-interlaced
+design/screenshots/Inputs & Form Controls.png:      PNG image data, 1000 x 550, 8-bit/color RGBA, non-interlaced
+EXIT:0
+
+VISUAL_INSPECTION: PASS
+- Admin — Data Pengguna: duplicate add-user modal absent.
+- Desktop Login — Default: fake forgot-password link absent.
+- Desktop Login — Error State: fake forgot-password link absent; error state retained.
+- Buttons & Action Controls: retained and visually intact.
+- Inputs & Form Controls: retained and visually intact.
+
+REGENERATION_COMMAND: node design/generate_sparta.js > /tmp/opencode/generate-cleanup-final.log 2>&1
+REGENERATION_EXIT:0
+REGENERATION_LOG:/tmp/opencode/generate-cleanup-final.log
+HASHES: semantic 73fa813ee227801c7febf5ca2cd80430c1655ae27a406ebeb7f73436d01bd2c8; JSON 10b9af32de8dfd4c59628e845da65c6d972b4e383de7bc8a6f1f0cba00109717
+LIMITATION: Stable-ID allocator unavailable; 43 retained frame IDs remapped consistently by name.
