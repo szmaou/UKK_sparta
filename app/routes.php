@@ -26,3 +26,15 @@ foreach ($roles as $role) {
         [$role]
     );
 }
+
+// Admin master data: kategori and alat (FR-04, FR-05). POST routes carry CSRF
+// through the front controller.
+foreach (['kategori', 'alat'] as $module) {
+    $controller = $app[$module . 'Controller'];
+    $router->get('/admin/' . $module, [$controller, 'index'], ['admin']);
+    $router->get('/admin/' . $module . '/create', [$controller, 'create'], ['admin']);
+    $router->post('/admin/' . $module . '/create', [$controller, 'store'], ['admin']);
+    $router->get('/admin/' . $module . '/{id}/edit', [$controller, 'edit'], ['admin']);
+    $router->post('/admin/' . $module . '/{id}/edit', [$controller, 'update'], ['admin']);
+    $router->post('/admin/' . $module . '/{id}/delete', [$controller, 'destroy'], ['admin']);
+}

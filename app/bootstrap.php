@@ -29,6 +29,22 @@ $app = [
         $view
     ),
     'dashboardController' => new App\Controllers\DashboardController($auth, $session, $view),
+    'kategoriController' => new App\Controllers\KategoriController(
+        $auth,
+        $session,
+        $view,
+        new App\Models\Kategori($container['db'], new App\Models\ActivityLog($container['db']))
+    ),
+    'alatController' => new App\Controllers\AlatController(
+        $auth,
+        $session,
+        $view,
+        new App\Models\Alat(
+            $container['db'],
+            new App\Models\ActivityLog($container['db']),
+            new App\Models\Kategori($container['db'], new App\Models\ActivityLog($container['db']))
+        )
+    ),
 ];
 
 $router = new App\Core\Router();
