@@ -10,9 +10,10 @@ CSRF, pemeriksaan role, dashboard dasar, serta CRUD pengguna, kategori, dan alat
 untuk Admin. Master data mendukung pencarian, pagination, audit perubahan, dan
 perlindungan stok serta histori transaksi. Akun dinonaktifkan tanpa menghapus
 histori; Admin tidak dapat menonaktifkan atau mengganti role akunnya sendiri.
-CRUD transaksi, alur peminjaman,
-persetujuan, pengembalian, dan laporan belum tersedia. Dashboard tidak menampilkan
-angka fiktif.
+Peminjam dapat mencari katalog, mengajukan peminjaman, dan melihat riwayat sendiri.
+Petugas dapat menyetujui atau menolak pengajuan. Stok dikurangi dalam transaksi
+saat persetujuan, bukan saat pengajuan. CRUD administratif transaksi,
+pengembalian, dan laporan belum tersedia. Dashboard tidak menampilkan angka fiktif.
 
 ## Requirement
 
@@ -99,6 +100,7 @@ php tests/database/schema_test.php
 php tests/http_auth_test.php
 php tests/http_master_data_test.php
 php tests/http_users_test.php
+php tests/http_loans_test.php
 ```
 
 Uji HTTP membutuhkan `curl` dan menjalankan development server sementara sendiri.
