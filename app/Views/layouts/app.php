@@ -9,28 +9,33 @@ $roleLabel = ['admin' => 'Admin', 'petugas' => 'Petugas', 'peminjam' => 'Peminja
 $name = (string) ($user['name'] ?? $user['username'] ?? 'Pengguna');
 $username = (string) ($user['username'] ?? '');
 $pageTitle = (string) ($pageTitle ?? 'Dashboard');
+$activeNav = (string) ($activeNav ?? match (true) {
+    str_contains(strtolower($pageTitle), 'kategori') => 'kategori',
+    str_contains(strtolower($pageTitle), 'alat') => 'alat',
+    default => 'dashboard',
+});
 
 $menus = [
     'admin' => [
-        ['layout-dashboard', 'Dashboard', true],
-        ['users', 'Pengguna', false],
-        ['tags', 'Kategori', false],
-        ['wrench', 'Alat', false],
-        ['clipboard-list', 'Peminjaman', false],
-        ['refresh-cw', 'Pengembalian', false],
-        ['logs', 'Log Aktivitas', false],
+        ['layout-dashboard', 'Dashboard', '/admin/dashboard', 'dashboard'],
+        ['users', 'Pengguna', null, 'pengguna'],
+        ['tags', 'Kategori', '/admin/kategori', 'kategori'],
+        ['wrench', 'Alat', '/admin/alat', 'alat'],
+        ['clipboard-list', 'Peminjaman', null, 'peminjaman'],
+        ['refresh-cw', 'Pengembalian', null, 'pengembalian'],
+        ['logs', 'Log Aktivitas', null, 'log'],
     ],
     'petugas' => [
-        ['layout-dashboard', 'Dashboard', true],
-        ['square-check', 'Persetujuan', false],
-        ['refresh-cw', 'Pengembalian', false],
-        ['file-text', 'Laporan', false],
+        ['layout-dashboard', 'Dashboard', '/petugas/dashboard', 'dashboard'],
+        ['square-check', 'Persetujuan', null, 'persetujuan'],
+        ['refresh-cw', 'Pengembalian', null, 'pengembalian'],
+        ['file-text', 'Laporan', null, 'laporan'],
     ],
     'peminjam' => [
-        ['layout-dashboard', 'Dashboard', true],
-        ['search', 'Katalog Alat', false],
-        ['clipboard-list', 'Peminjaman Saya', false],
-        ['refresh-cw', 'Pengembalian', false],
+        ['layout-dashboard', 'Dashboard', '/peminjam/dashboard', 'dashboard'],
+        ['search', 'Katalog Alat', null, 'katalog'],
+        ['clipboard-list', 'Peminjaman Saya', null, 'peminjaman'],
+        ['refresh-cw', 'Pengembalian', null, 'pengembalian'],
     ],
 ];
 if (!isset($menus[$currentRole])) {
@@ -38,7 +43,6 @@ if (!isset($menus[$currentRole])) {
     $roleLabel = 'Peminjam';
 }
 $navigation = $menus[$currentRole];
-$dashboardUrl = '/' . $currentRole . '/dashboard';
 ?>
 <!doctype html>
 <html lang="id" data-theme="sparta">
@@ -94,10 +98,10 @@ $dashboardUrl = '/' . $currentRole . '/dashboard';
             <nav class="flex-1 p-3" aria-label="Navigasi utama">
                 <p class="px-3 pb-2 pt-3 text-xs font-bold uppercase tracking-widest text-slate-400">Menu <?= e($roleLabel) ?></p>
                 <ul class="menu sidebar-menu w-full gap-1 p-0">
-                    <?php foreach ($navigation as [$menuIcon, $label, $available]): ?>
+                    <?php foreach ($navigation as [$menuIcon, $label, $url, $navKey]): ?>
                         <li>
-                            <?php if ($available): ?>
-                                <a href="<?= e($dashboardUrl) ?>" aria-current="page">
+                            <?php if ($url !== null): ?>
+                                <a href="<?= e($url) ?>"<?= $activeNav === $navKey ? ' aria-current="page"' : '' ?>>
                                     <span class="app-icon" aria-hidden="true"><?= icon($menuIcon) ?></span>
                                     <?= e($label) ?>
                                 </a>

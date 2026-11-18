@@ -12,7 +12,7 @@ $roleCopy = [
         'intro' => 'Kelola data sekolah dari satu ruang kerja yang rapi.',
         'icon' => 'users',
         'title' => 'Ruang kelola Admin',
-        'body' => 'Modul pengguna, kategori, alat, transaksi, dan log aktivitas sedang disiapkan.',
+        'body' => 'Kelola kategori dan alat dari menu inventaris. Modul lain tetap ditandai sesuai ketersediaannya.',
         'modules' => ['Pengguna', 'Kategori & alat', 'Transaksi', 'Log aktivitas'],
     ],
     'petugas' => [
@@ -44,7 +44,7 @@ ob_start();
             <h2 class="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Selamat datang, <?= e($name) ?></h2>
             <p class="mt-2 max-w-2xl text-slate-600"><?= e($copy['intro']) ?></p>
         </div>
-        <p class="text-sm text-slate-500">Fase 1 · Dasbor dasar</p>
+        <p class="text-sm text-slate-500">Ruang kerja <?= e($copy['label']) ?></p>
     </section>
 
     <section class="grid gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(18rem,0.75fr)]">
@@ -61,7 +61,8 @@ ob_start();
                                 <span class="app-icon text-slate-500" aria-hidden="true"><?= icon('wrench') ?></span>
                                 <span class="truncate font-semibold"><?= e($module) ?></span>
                             </div>
-                            <span class="badge badge-ghost badge-sm whitespace-nowrap">Belum tersedia</span>
+                            <?php $moduleReady = $currentRole === 'admin' && $module === 'Kategori & alat'; ?>
+                            <span class="badge badge-sm whitespace-nowrap <?= $moduleReady ? 'border-green-200 bg-green-50 text-green-800' : 'badge-ghost' ?>"><?= $moduleReady ? 'Tersedia' : 'Belum tersedia' ?></span>
                         </div>
                     <?php endforeach; ?>
                 </div>
@@ -71,8 +72,8 @@ ob_start();
         <aside class="card border border-base-300 bg-indigo-950 text-white shadow-sm">
             <div class="card-body p-6 sm:p-7">
                 <span class="app-icon text-indigo-200" aria-hidden="true"><?= icon('circle-exclamation-point') ?></span>
-                <h3 class="card-title mt-2 text-xl">Tentang tahap ini</h3>
-                <p class="leading-7 text-indigo-100">Login, logout, dan tampilan dashboard sudah tersedia. Data operasional belum ditampilkan agar tidak menyerupai data nyata.</p>
+                <h3 class="card-title mt-2 text-xl">Akses sesuai peran</h3>
+                <p class="leading-7 text-indigo-100">Gunakan menu yang tersedia untuk membuka fitur sesuai hak akses akun Anda.</p>
                 <div class="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
                     <p class="text-sm font-semibold">Akun aktif</p>
                     <p class="mt-1 truncate text-sm text-indigo-200">@<?= e((string) ($user['username'] ?? '')) ?></p>
