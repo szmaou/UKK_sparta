@@ -1,4 +1,6 @@
 .codegraph/
+/node_modules/
+/.env
 
 # Generated design artifacts
 /design/SPARTA.json
