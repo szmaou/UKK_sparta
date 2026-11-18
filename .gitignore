@@ -1,6 +1,7 @@
 .codegraph/
 /node_modules/
 /.env
+/config/database.local.php
 
 # Generated design artifacts
 /design/SPARTA.json

@@ -42,6 +42,10 @@ pengembalian, dan laporan belum tersedia. Dashboard tidak menampilkan angka fikt
    ```
 
    `.env.example` hanya referensi variabel. Aplikasi tidak memuat `.env` otomatis.
+   Sebagai alternatif lokal, buat `config/database.local.php` yang mengembalikan
+   array dengan key `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, dan `DB_PASSWORD`.
+   File ini diabaikan Git; batasi izin ke `600`. Environment variable selalu
+   mengalahkan konfigurasi lokal, termasuk password kosong.
 
 3. Buat data demo, build CSS, lalu jalankan development server:
 

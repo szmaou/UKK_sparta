@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 // Returns the connection contract used by bootstrap/app.php and seeders.
 // Values come from the environment; defaults target the local demo database.
-$env = static function (string $key, string $default): string {
+$localPath = __DIR__ . '/database.local.php';
+$local = is_file($localPath) ? require $localPath : [];
+$env = static function (string $key, string $default) use ($local): string {
     $value = getenv($key);
 
-    return $value === false || $value === '' ? $default : $value;
+    return $value === false ? ($local[$key] ?? $default) : $value;
 };
 
 return [
