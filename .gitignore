@@ -1,1 +1,8 @@
 .codegraph/
+
+# Generated design artifacts
+/design/SPARTA.json
+/design/modules/
+/design/screenshots/
+/design/coverage.json
+/design/*-validation.log
