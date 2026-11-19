@@ -16,6 +16,14 @@ php database/seeders/seed.php
 existing tables. Later column/index changes belong in `database/migrations/`, not
 in `schema.sql`. `routines.sql` uses `CREATE OR REPLACE`, so it can be re-applied.
 
+Upgrade an existing database with the migrations, in order:
+
+```bash
+mariadb -u sparta -p sparta < database/migrations/001_add_alat_foto.sql
+mariadb -u sparta -p sparta < database/migrations/002_add_pengaturan.sql
+mariadb -u sparta -p sparta < database/migrations/003_add_login_attempts.sql
+```
+
 ## Connection contract
 
 `config/database.php` returns `['dsn', 'username', 'password']` and `bootstrap/app.php`

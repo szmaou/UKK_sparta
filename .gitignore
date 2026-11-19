@@ -10,3 +10,6 @@
 /design/screenshots/
 /design/coverage.json
 /design/*-validation.log
+/public/uploads/alat/*
+!/public/uploads/alat/.gitkeep
+!/public/uploads/alat/.htaccess

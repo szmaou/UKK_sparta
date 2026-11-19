@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS alat (
     kategori_id    INT UNSIGNED    NOT NULL,
     nama           VARCHAR(150)    NOT NULL,
     deskripsi      TEXT            NULL,
+    foto           VARCHAR(255)    NULL,
     stok_total     INT UNSIGNED    NOT NULL DEFAULT 0,
     stok_tersedia  INT UNSIGNED    NOT NULL DEFAULT 0,
     is_active      TINYINT(1)      NOT NULL DEFAULT 1,
@@ -109,6 +110,13 @@ CREATE TABLE IF NOT EXISTS pengembalian (
     CONSTRAINT chk_pengembalian_denda CHECK (denda >= 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS pengaturan (
+    kunci      VARCHAR(50)  NOT NULL,
+    nilai      VARCHAR(255) NOT NULL,
+    updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (kunci)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS activity_logs (
     id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     user_id     BIGINT UNSIGNED NULL,
@@ -123,4 +131,14 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     KEY idx_activity_logs_entity (entity_type, entity_id),
     CONSTRAINT fk_activity_logs_user FOREIGN KEY (user_id)
         REFERENCES users (id) ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS login_attempts (
+    username_hash CHAR(64)         NOT NULL,
+    attempts      SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    window_start  DATETIME         NOT NULL,
+    blocked_until DATETIME         NULL,
+    updated_at    TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (username_hash),
+    KEY idx_login_attempts_updated_at (updated_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

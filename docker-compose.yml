@@ -1,0 +1,49 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${APP_PORT:-8080}:80"
+    environment:
+      # DB_HOST stays "db" (container network); other values come from .env via
+      # Compose interpolation, falling back to demo defaults when unset.
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME-sparta}
+      DB_USER: ${DB_USER-sparta}
+      DB_PASSWORD: ${DB_PASSWORD-sparta}
+    volumes:
+      - uploads:/var/www/html/public/uploads/alat
+      - sessions:/var/lib/php/sessions
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: mariadb:11.4
+    ports:
+      # Host-only bind: DB not exposed to the network.
+      - "127.0.0.1:${DB_PUBLISH_PORT:-3307}:3306"
+    environment:
+      MARIADB_DATABASE: ${DB_NAME-sparta}
+      MARIADB_USER: ${DB_USER-sparta}
+      MARIADB_PASSWORD: ${DB_PASSWORD-sparta}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD-root}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/routines.sql:/docker-entrypoint-initdb.d/02-routines.sql:ro
+      - ./database/seeders/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  uploads:
+  sessions:
