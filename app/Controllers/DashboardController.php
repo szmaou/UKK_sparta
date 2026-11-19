@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Core\Session;
 use App\Core\View;
+use App\Models\Dashboard;
 use App\Services\Auth;
 
 final class DashboardController
@@ -13,7 +14,8 @@ final class DashboardController
     public function __construct(
         private Auth $auth,
         private Session $session,
-        private View $view
+        private View $view,
+        private Dashboard $dashboard
     ) {
     }
 
@@ -40,6 +42,7 @@ final class DashboardController
             'error' => null,
             'oldUsername' => '',
             'role' => $role,
+            'stats' => $this->dashboard->forRole($role, (int) $user['id']),
         ]);
     }
 }

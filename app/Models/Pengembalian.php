@@ -9,15 +9,16 @@ use Throwable;
 
 /**
  * Return requests and physical reception. A request never moves stock; a
- * verified reception locks tool -> loan -> return and adds the full borrowed
- * quantity back exactly once. Status audit stays with the database trigger.
+ * verified reception locks tool -> loan -> return and returns the borrowed
+ * quantity exactly once — only for condition "baik". Damaged or lost items stay
+ * out of available stock. Status audit stays with the database trigger.
  */
 final class Pengembalian
 {
     public const PER_PAGE = 10;
     private const LOAN_STATUSES = "('approved', 'return_requested', 'returned')";
 
-    public function __construct(private PDO $db)
+    public function __construct(private PDO $db, private Pengaturan $pengaturan)
     {
     }
 
@@ -239,13 +240,9 @@ final class Pengembalian
 
             $jumlah = (int) $loan['jumlah'];
             $due = (string) $loan['tanggal_jatuh_tempo'];
-            $hariTerlambat = max(
-                0,
-                (int) floor(((new DateTimeImmutable($acceptedDate))->getTimestamp()
-                    - (new DateTimeImmutable($due))->getTimestamp()) / 86400)
-            );
-            $dendaStmt = $this->db->prepare('SELECT fn_hitung_denda(?, ?, ?, 0)');
-            $dendaStmt->execute([$due, $acceptedDate, $jumlah]);
+            $hariTerlambat = self::lateDays($due, $acceptedDate);
+            $dendaStmt = $this->db->prepare('SELECT fn_hitung_denda(?, ?, ?, ?)');
+            $dendaStmt->execute([$due, $acceptedDate, $jumlah, $this->pengaturan->tarifDenda()]);
             $denda = $dendaStmt->fetchColumn();
             if ($denda === false) {
                 $denda = 0;
@@ -276,10 +273,13 @@ final class Pengembalian
                 'UPDATE alat SET stok_tersedia = stok_tersedia + ?
                  WHERE id = ? AND stok_tersedia + ? <= stok_total'
             );
-            $increment->execute([$jumlah, (int) $alat['id'], $jumlah]);
-            if ($increment->rowCount() !== 1) {
-                $this->db->rollBack();
-                return 'stock_conflict';
+            $restore = self::restoredStock($kondisi, $jumlah);
+            if ($restore > 0) {
+                $increment->execute([$restore, (int) $alat['id'], $restore]);
+                if ($increment->rowCount() !== 1) {
+                    $this->db->rollBack();
+                    return 'stock_conflict';
+                }
             }
 
             $update = $this->db->prepare(
@@ -294,6 +294,240 @@ final class Pengembalian
 
             $this->db->commit();
             return 'verified';
+        } catch (Throwable $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $exception;
+        } finally {
+            $this->db->exec('SET @sparta_actor_id = NULL');
+        }
+    }
+
+    /**
+     * Admin return records (FR-07): pending reception vs already verified.
+     *
+     * @return array{items: list<array<string, mixed>>, total: int, totalPages: int}
+     */
+    public function adminPaginate(string $q, string $status, int $page): array
+    {
+        $where = [];
+        $params = [];
+        $q = mb_substr(trim($q), 0, 100);
+        $where[] = match ($status) {
+            'pending' => 'pg.tanggal_diterima IS NULL',
+            'verified' => 'pg.tanggal_diterima IS NOT NULL',
+            default => '1 = 1',
+        };
+        if ($q !== '') {
+            $where[] = '(p.kode LIKE :qk OR u.name LIKE :qn OR a.nama LIKE :qa)';
+            $params[':qk'] = '%' . $q . '%';
+            $params[':qn'] = '%' . $q . '%';
+            $params[':qa'] = '%' . $q . '%';
+        }
+        $from = ' FROM pengembalian pg
+                  JOIN peminjaman p ON p.id = pg.peminjaman_id
+                  JOIN users u ON u.id = p.user_id
+                  JOIN alat a ON a.id = p.alat_id
+                  WHERE ' . implode(' AND ', $where);
+
+        return $this->paginate(
+            'SELECT p.id AS loan_id, p.kode, u.name AS peminjam_nama, a.nama AS alat_nama,
+                    pg.jumlah, p.status, pg.tanggal_pengajuan, pg.tanggal_diterima, pg.kondisi,
+                    pg.hari_terlambat, pg.denda'
+                . $from
+                . ' ORDER BY pg.tanggal_pengajuan DESC, pg.id DESC',
+            'SELECT COUNT(*)' . $from,
+            $params,
+            $page
+        );
+    }
+
+    /** @return array<string, mixed>|null */
+    public function adminFind(int $loanId): ?array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT p.id AS loan_id, p.kode, p.user_id, u.name AS peminjam_nama, a.nama AS alat_nama,
+                    p.jumlah AS jumlah_pinjam, p.tanggal_pinjam, p.tanggal_jatuh_tempo, p.status,
+                    pg.id AS return_id, pg.jumlah, pg.tanggal_pengajuan, pg.tanggal_diterima,
+                    pg.kondisi, pg.hari_terlambat, pg.denda
+             FROM pengembalian pg
+             JOIN peminjaman p ON p.id = pg.peminjaman_id
+             JOIN users u ON u.id = p.user_id
+             JOIN alat a ON a.id = p.alat_id
+             WHERE pg.peminjaman_id = ? LIMIT 1'
+        );
+        $stmt->execute([$loanId]);
+        $row = $stmt->fetch();
+
+        return is_array($row) ? $row : null;
+    }
+
+    /**
+     * Correct a verified reception. Condition changes move stock by the delta
+     * between the old and new restorable quantity; date/condition metadata and
+     * the fine are recomputed from the stored loan dates. The delta update is
+     * guarded so stok_tersedia can never leave 0..stok_total.
+     *
+     * @return 'updated'|'missing'|'not_verified'|'invalid_date'|'stock_conflict'
+     */
+    public function adminUpdate(int $loanId, string $acceptedDate, string $kondisi, int $actorId): string
+    {
+        $this->db->beginTransaction();
+        try {
+            // Lock the tool before the loan, same order as verify(), to avoid deadlocks.
+            $toolStmt = $this->db->prepare(
+                'SELECT id, stok_total, stok_tersedia FROM alat
+                 WHERE id = (SELECT alat_id FROM peminjaman WHERE id = ?) FOR UPDATE'
+            );
+            $toolStmt->execute([$loanId]);
+            $alat = $toolStmt->fetch();
+            if (!is_array($alat)) {
+                $this->db->rollBack();
+
+                return 'missing';
+            }
+
+            $loanStmt = $this->db->prepare(
+                'SELECT id, jumlah, status, tanggal_pinjam, tanggal_jatuh_tempo
+                 FROM peminjaman WHERE id = ? FOR UPDATE'
+            );
+            $loanStmt->execute([$loanId]);
+            $loan = $loanStmt->fetch();
+
+            $returnStmt = $this->db->prepare(
+                'SELECT id, tanggal_pengajuan, tanggal_diterima, jumlah, kondisi, hari_terlambat, denda
+                 FROM pengembalian WHERE peminjaman_id = ? FOR UPDATE'
+            );
+            $returnStmt->execute([$loanId]);
+            $return = $returnStmt->fetch();
+            if (!is_array($loan) || !is_array($return)) {
+                $this->db->rollBack();
+
+                return 'missing';
+            }
+            if ((string) $loan['status'] !== 'returned' || $return['tanggal_diterima'] === null) {
+                $this->db->rollBack();
+
+                return 'not_verified';
+            }
+
+            $pinjam = substr((string) $loan['tanggal_pinjam'], 0, 10);
+            $pengajuan = substr((string) $return['tanggal_pengajuan'], 0, 10);
+            if (!self::isDate($acceptedDate)
+                || $acceptedDate < $pinjam
+                || $acceptedDate < $pengajuan
+                || $acceptedDate > date('Y-m-d')) {
+                $this->db->rollBack();
+
+                return 'invalid_date';
+            }
+
+            $jumlah = (int) $loan['jumlah'];
+            $due = (string) $loan['tanggal_jatuh_tempo'];
+            // Notes-only corrections keep the historical fine; a date correction reprices at the current tariff.
+            if (substr((string) $return['tanggal_diterima'], 0, 10) === $acceptedDate) {
+                $hariTerlambat = (int) $return['hari_terlambat'];
+                $denda = (string) $return['denda'];
+            } else {
+                $hariTerlambat = self::lateDays($due, $acceptedDate);
+                $dendaStmt = $this->db->prepare('SELECT fn_hitung_denda(?, ?, ?, ?)');
+                $dendaStmt->execute([$due, $acceptedDate, $jumlah, $this->pengaturan->tarifDenda()]);
+                $denda = $dendaStmt->fetchColumn();
+                if ($denda === false) {
+                    $denda = 0;
+                }
+            }
+
+            $update = $this->db->prepare(
+                'UPDATE pengembalian
+                 SET tanggal_diterima = ?, kondisi = ?, hari_terlambat = ?, denda = ?
+                 WHERE id = ?'
+            );
+            $update->execute([
+                $acceptedDate . ' 00:00:00',
+                $kondisi,
+                $hariTerlambat,
+                $denda,
+                (int) $return['id'],
+            ]);
+            $delta = self::restoredStock($kondisi, $jumlah)
+                - self::restoredStock((string) $return['kondisi'], $jumlah);
+            if ($delta !== 0) {
+                $adjust = $this->db->prepare(
+                    'UPDATE alat SET stok_tersedia = stok_tersedia + ?
+                     WHERE id = ? AND stok_tersedia + ? BETWEEN 0 AND stok_total'
+                );
+                $adjust->execute([$delta, (int) $alat['id'], $delta]);
+                if ($adjust->rowCount() !== 1) {
+                    $this->db->rollBack();
+
+                    return 'stock_conflict';
+                }
+            }
+            $this->db->prepare(
+                'INSERT INTO activity_logs (user_id, action, entity_type, entity_id, description)
+                 VALUES (?, \'update\', \'pengembalian\', ?, ?)'
+            )->execute([$actorId, $loanId, 'Koreksi data pengembalian']);
+            $this->db->commit();
+
+            return 'updated';
+        } catch (Throwable $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $exception;
+        }
+    }
+
+    /**
+     * Delete an unverified request and return the loan to "approved". Verified
+     * receptions are kept because deleting them would desync stock history.
+     *
+     * @return 'deleted'|'missing'|'not_pending'|'verified_conflict'
+     */
+    public function adminDelete(int $loanId, int $actorId): string
+    {
+        $this->db->beginTransaction();
+        try {
+            $loanStmt = $this->db->prepare('SELECT kode, status FROM peminjaman WHERE id = ? FOR UPDATE');
+            $loanStmt->execute([$loanId]);
+            $loan = $loanStmt->fetch();
+
+            $returnStmt = $this->db->prepare(
+                'SELECT id, tanggal_diterima FROM pengembalian WHERE peminjaman_id = ? FOR UPDATE'
+            );
+            $returnStmt->execute([$loanId]);
+            $return = $returnStmt->fetch();
+            if (!is_array($loan) || !is_array($return)) {
+                $this->db->rollBack();
+
+                return 'missing';
+            }
+            if ((string) $loan['status'] !== 'return_requested' || $return['tanggal_diterima'] !== null) {
+                $this->db->rollBack();
+
+                return 'verified_conflict';
+            }
+
+            $this->db->prepare('DELETE FROM pengembalian WHERE id = ?')->execute([(int) $return['id']]);
+            $this->db->prepare('SET @sparta_actor_id = ?')->execute([$actorId]);
+            $update = $this->db->prepare(
+                "UPDATE peminjaman SET status = 'approved' WHERE id = ? AND status = 'return_requested'"
+            );
+            $update->execute([$loanId]);
+            if ($update->rowCount() !== 1) {
+                $this->db->rollBack();
+
+                return 'not_pending';
+            }
+            $this->db->prepare(
+                'INSERT INTO activity_logs (user_id, action, entity_type, entity_id, description)
+                 VALUES (?, \'delete\', \'pengembalian\', ?, ?)'
+            )->execute([$actorId, $loanId, 'Hapus pengajuan pengembalian: ' . $loan['kode']]);
+            $this->db->commit();
+
+            return 'deleted';
         } catch (Throwable $exception) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
@@ -331,6 +565,21 @@ final class Pengembalian
         ];
     }
 
+    /** Whole calendar days late; independent of seconds or DST between dates. */
+    private static function lateDays(string $due, string $accepted): int
+    {
+        $diff = (new DateTimeImmutable($due))->diff(new DateTimeImmutable($accepted));
+        return $diff->invert === 1 ? 0 : $diff->days;
+    }
+
+    /**
+     * Only an undamaged return re-enters available stock. Damaged or lost items
+     * stay out of circulation until the physical asset is resolved by an Admin.
+     */
+    private static function restoredStock(string $kondisi, int $jumlah): int
+    {
+        return $kondisi === 'baik' ? max(0, $jumlah) : 0;
+    }
     private static function isDate(string $value): bool
     {
         if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value) !== 1) {

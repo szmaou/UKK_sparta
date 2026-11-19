@@ -23,7 +23,8 @@ $logs = new App\Models\ActivityLog($container['db']);
 $alatModel = new App\Models\Alat($container['db'], $logs, new App\Models\Kategori($container['db'], $logs));
 $loans = new App\Models\Peminjaman($container['db'], $logs);
 $peminjamanService = new App\Services\PeminjamanService($alatModel, $loans);
-$returns = new App\Models\Pengembalian($container['db']);
+$pengaturan = new App\Models\Pengaturan($container['db'], $logs);
+$returns = new App\Models\Pengembalian($container['db'], $pengaturan);
 
 $app = [
     'db' => $container['db'],
@@ -35,9 +36,15 @@ $app = [
         $auth,
         $session,
         new App\Models\ActivityLog($container['db']),
-        $view
+        $view,
+        new App\Models\LoginThrottle($container['db'])
     ),
-    'dashboardController' => new App\Controllers\DashboardController($auth, $session, $view),
+    'dashboardController' => new App\Controllers\DashboardController(
+        $auth,
+        $session,
+        $view,
+        new App\Models\Dashboard($container['db'])
+    ),
     'kategoriController' => new App\Controllers\KategoriController(
         $auth,
         $session,
@@ -81,7 +88,40 @@ $app = [
         $session,
         $view,
         $returns,
+        new App\Services\PengembalianService(),
+        $pengaturan
+    ),
+    'pengaturanController' => new App\Controllers\PengaturanController(
+        $auth,
+        $session,
+        $view,
+        $pengaturan
+    ),
+    'adminPeminjamanController' => new App\Controllers\AdminPeminjamanController(
+        $auth,
+        $session,
+        $view,
+        $loans,
+        $peminjamanService
+    ),
+    'adminPengembalianController' => new App\Controllers\AdminPengembalianController(
+        $auth,
+        $session,
+        $view,
+        $returns,
         new App\Services\PengembalianService()
+    ),
+    'activityLogController' => new App\Controllers\ActivityLogController(
+        $auth,
+        $session,
+        $view,
+        $logs
+    ),
+    'laporanController' => new App\Controllers\LaporanController(
+        $auth,
+        $session,
+        $view,
+        new App\Models\Laporan($container['db'])
     ),
 ];
 

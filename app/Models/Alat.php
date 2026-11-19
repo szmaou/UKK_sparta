@@ -14,6 +14,13 @@ final class Alat
 {
     public const PER_PAGE = 10;
     private const MAX_UNSIGNED = 4294967295;
+    public const FOTO_MAX_BYTES = 2097152; // 2 MB
+    /** @var array<string, string> */
+    public const FOTO_MIMES = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+    ];
     public function __construct(private PDO $db, private ActivityLog $logs, private Kategori $kategori)
     {
     }
@@ -37,6 +44,7 @@ final class Alat
                 is_string($input['is_active']) => trim($input['is_active']),
                 default => '',
             },
+            'hapus_foto' => is_string($input['hapus_foto'] ?? null) && $input['hapus_foto'] === '1' ? '1' : '0',
         ];
         $errors = [];
         if ($values['kode'] === '') {
@@ -69,6 +77,83 @@ final class Alat
         }
         return ['values' => $values, 'errors' => $errors];
     }
+    /**
+     * Validate and store an uploaded photo. Returns [filename|null, error|null].
+     * On replace, pass $existing to delete the old file after a successful save.
+     *
+     * @param array<string, mixed>|null $file entry from $_FILES
+     * @return array{0: ?string, 1: ?string}
+     */
+    public function savePhoto(?array $file, ?string $existing = null): array
+    {
+        if (!is_array($file) || !isset($file['error'])) {
+            return [null, null];
+        }
+        $error = (int) $file['error'];
+        if ($error === UPLOAD_ERR_NO_FILE) {
+            return [null, null];
+        }
+        if ($error !== UPLOAD_ERR_OK) {
+            return [null, 'Foto gagal diunggah. Coba lagi.'];
+        }
+        $tmp = is_string($file['tmp_name'] ?? null) ? $file['tmp_name'] : '';
+        $size = is_int($file['size'] ?? null) ? $file['size'] : (is_numeric($file['size'] ?? null) ? (int) $file['size'] : 0);
+        if ($tmp === '' || !is_uploaded_file($tmp)) {
+            return [null, 'Foto tidak valid.'];
+        }
+        if ($size <= 0 || $size > self::FOTO_MAX_BYTES) {
+            return [null, 'Ukuran foto maksimal 2 MB.'];
+        }
+        $mime = $this->detectImageMime($tmp);
+        if ($mime === null || !isset(self::FOTO_MIMES[$mime])) {
+            return [null, 'Format foto harus JPG, PNG, atau WebP.'];
+        }
+        $dir = $this->uploadDir();
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            return [null, 'Direktori unggahan foto tidak tersedia.'];
+        }
+        $filename = bin2hex(random_bytes(16)) . '.' . self::FOTO_MIMES[$mime];
+        if (!move_uploaded_file($tmp, $dir . '/' . $filename)) {
+            return [null, 'Foto gagal disimpan.'];
+        }
+        if ($existing !== null && $existing !== '') {
+            $this->deletePhotoFile($existing);
+        }
+        return [$filename, null];
+    }
+
+    public function deletePhotoFile(?string $filename): void
+    {
+        if ($filename === null || $filename === '' || !preg_match('/^[a-f0-9]{32}\.(jpg|png|webp)$/', $filename)) {
+            return;
+        }
+        $path = $this->uploadDir() . '/' . $filename;
+        if (is_file($path)) {
+            @unlink($path);
+        }
+    }
+
+    private function detectImageMime(string $path): ?string
+    {
+        if (function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo !== false) {
+                $mime = finfo_file($finfo, $path) ?: null;
+                finfo_close($finfo);
+                if (is_string($mime) && $mime !== '') {
+                    return $mime;
+                }
+            }
+        }
+        $info = @getimagesize($path);
+        return is_array($info) && isset($info['mime']) && is_string($info['mime']) ? $info['mime'] : null;
+    }
+
+    private function uploadDir(): string
+    {
+        return dirname(__DIR__, 2) . '/public/uploads/alat';
+    }
+
     /** @return array{items: list<array<string, mixed>>, total: int, totalPages: int} */
     public function paginate(string $q, int $page): array
     {
@@ -83,7 +168,7 @@ final class Alat
         $count->execute();
         $total = (int) $count->fetchColumn();
         $stmt = $this->db->prepare(
-            'SELECT a.id, a.kode, a.nama, a.kategori_id, k.nama AS kategori_nama, a.deskripsi,
+            'SELECT a.id, a.kode, a.nama, a.kategori_id, k.nama AS kategori_nama, a.deskripsi, a.foto,
                     a.stok_total, a.stok_tersedia, a.stok_total - a.stok_tersedia AS stok_dipinjam,
                     a.is_active
              FROM alat a JOIN kategori k ON k.id = a.kategori_id' . $compare
@@ -131,7 +216,7 @@ final class Alat
         $count->execute();
         $total = (int) $count->fetchColumn();
         $stmt = $this->db->prepare(
-            'SELECT a.id, a.kode, a.nama, k.nama AS kategori_nama, a.deskripsi, a.stok_tersedia'
+            'SELECT a.id, a.kode, a.nama, k.nama AS kategori_nama, a.deskripsi, a.foto, a.stok_tersedia'
             . $sql . ' ORDER BY a.nama, a.id LIMIT :limit OFFSET :offset'
         );
         foreach ($params as $key => $value) {
@@ -151,7 +236,7 @@ final class Alat
     public function find(int $id): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, kode, nama, kategori_id, deskripsi, stok_total, stok_tersedia,
+            'SELECT id, kode, nama, kategori_id, deskripsi, foto, stok_total, stok_tersedia,
                     stok_total - stok_tersedia AS stok_dipinjam, is_active
              FROM alat WHERE id = ? LIMIT 1'
         );
@@ -162,22 +247,24 @@ final class Alat
     /**
      * Create with stok_tersedia equal to stok_total. Insert and audit commit together.
      *
-     * @param array<string, string> $values parsed, error-free values
+     * @param array<string, string> $values parsed, error-free values (may include 'foto')
      */
     public function create(array $values, int $actorId): int
     {
         $total = (int) $values['stok_total'];
+        $foto = ($values['foto'] ?? '') !== '' ? (string) $values['foto'] : null;
         $this->db->beginTransaction();
         try {
             $stmt = $this->db->prepare(
-                'INSERT INTO alat (kode, kategori_id, nama, deskripsi, stok_total, stok_tersedia, is_active)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO alat (kode, kategori_id, nama, deskripsi, foto, stok_total, stok_tersedia, is_active)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $stmt->execute([
                 $values['kode'],
                 (int) $values['kategori_id'],
                 $values['nama'],
                 $values['deskripsi'] === '' ? null : $values['deskripsi'],
+                $foto,
                 $total,
                 $total,
                 (int) $values['is_active'],
@@ -198,15 +285,17 @@ final class Alat
      * Update master data. The alat row is locked before reading the borrowed
      * amount; the new total must cover it, and stok_tersedia is recomputed.
      *
-     * @param array<string, string> $values parsed, error-free values
+     * @param array<string, string> $values parsed, error-free values (may include 'foto')
      * @return array{stok_dipinjam: int, stok_tersedia: int}|null null when the row vanished
      */
     public function update(int $id, array $values, int $actorId): ?array
     {
+        $foto = array_key_exists('foto', $values) ? (($values['foto'] ?? '') !== '' ? (string) $values['foto'] : null) : null;
+        $fotoProvided = array_key_exists('foto', $values);
         $this->db->beginTransaction();
         try {
             $lock = $this->db->prepare(
-                'SELECT stok_total, stok_tersedia FROM alat WHERE id = ? FOR UPDATE'
+                'SELECT stok_total, stok_tersedia, foto FROM alat WHERE id = ? FOR UPDATE'
             );
             $lock->execute([$id]);
             $row = $lock->fetch();
@@ -222,8 +311,9 @@ final class Alat
                     'Stok total tidak boleh kurang dari ' . $borrowed . ' unit yang sedang dipinjam.'
                 );
             }
+            $newFoto = $fotoProvided ? $foto : (is_string($row['foto'] ?? null) ? $row['foto'] : null);
             $stmt = $this->db->prepare(
-                'UPDATE alat SET kode = ?, kategori_id = ?, nama = ?, deskripsi = ?,
+                'UPDATE alat SET kode = ?, kategori_id = ?, nama = ?, deskripsi = ?, foto = ?,
                         stok_total = ?, stok_tersedia = ?, is_active = ? WHERE id = ?'
             );
             $stmt->execute([
@@ -231,6 +321,7 @@ final class Alat
                 (int) $values['kategori_id'],
                 $values['nama'],
                 $values['deskripsi'] === '' ? null : $values['deskripsi'],
+                $newFoto,
                 $total,
                 $total - $borrowed,
                 (int) $values['is_active'],
@@ -265,13 +356,15 @@ final class Alat
     {
         $this->db->beginTransaction();
         try {
-            $lock = $this->db->prepare('SELECT kode FROM alat WHERE id = ? FOR UPDATE');
+            $lock = $this->db->prepare('SELECT kode, foto FROM alat WHERE id = ? FOR UPDATE');
             $lock->execute([$id]);
-            $kode = $lock->fetchColumn();
-            if ($kode === false) {
+            $row = $lock->fetch();
+            if (!is_array($row)) {
                 $this->db->rollBack();
                 return 'missing';
             }
+            $kode = (string) $row['kode'];
+            $foto = is_string($row['foto'] ?? null) ? $row['foto'] : null;
             $refs = $this->db->prepare('SELECT COUNT(*) FROM peminjaman WHERE alat_id = ?');
             $refs->execute([$id]);
             if ((int) $refs->fetchColumn() > 0) {
@@ -291,6 +384,7 @@ final class Alat
             $stmt->execute([$id]);
             $this->logs->record($actorId, 'delete', 'alat', $id, 'Hapus alat: ' . $kode);
             $this->db->commit();
+            $this->deletePhotoFile($foto);
             return 'deleted';
         } catch (PDOException $exception) {
             $this->db->rollBack();

@@ -90,6 +90,55 @@ final class PeminjamanService
         ], $actorId);
     }
 
+    /**
+     * Admin correction of a pending request. Tool, owner and status are fixed;
+     * only quantity, dates and note may change.
+     *
+     * @param array<string, mixed> $input
+     * @return array{values: array{jumlah: int, tanggal_pinjam: string, tanggal_jatuh_tempo: string, catatan: ?string}, errors: array<string, string>}
+     */
+    public function validateAdmin(array $input): array
+    {
+        $raw = [
+            'jumlah' => is_string($input['jumlah'] ?? null) ? trim($input['jumlah']) : '',
+            'tanggal_pinjam' => is_string($input['tanggal_pinjam'] ?? null) ? trim($input['tanggal_pinjam']) : '',
+            'tanggal_jatuh_tempo' => is_string($input['tanggal_jatuh_tempo'] ?? null) ? trim($input['tanggal_jatuh_tempo']) : '',
+            'catatan' => is_string($input['catatan'] ?? null) ? trim($input['catatan']) : '',
+        ];
+        $errors = [];
+        $jumlah = 0;
+
+        if ($raw['jumlah'] === '' || preg_match('/^[1-9]\d{0,9}$/', $raw['jumlah']) !== 1
+            || (int) $raw['jumlah'] > self::MAX_UNSIGNED_INT) {
+            $errors['jumlah'] = 'Jumlah harus bilangan bulat lebih dari 0.';
+        } else {
+            $jumlah = (int) $raw['jumlah'];
+        }
+        if (!self::isDate($raw['tanggal_pinjam'])) {
+            $errors['tanggal_pinjam'] = 'Tanggal pinjam tidak valid.';
+        }
+        if (!self::isDate($raw['tanggal_jatuh_tempo'])) {
+            $errors['tanggal_jatuh_tempo'] = 'Tanggal jatuh tempo tidak valid.';
+        }
+        if (!isset($errors['tanggal_pinjam']) && !isset($errors['tanggal_jatuh_tempo'])
+            && $raw['tanggal_jatuh_tempo'] < $raw['tanggal_pinjam']) {
+            $errors['tanggal_jatuh_tempo'] = 'Jatuh tempo tidak boleh sebelum tanggal pinjam.';
+        }
+        if (mb_strlen($raw['catatan']) > 1000) {
+            $errors['catatan'] = 'Catatan maksimal 1000 karakter.';
+        }
+
+        return [
+            'values' => [
+                'jumlah' => $jumlah,
+                'tanggal_pinjam' => $raw['tanggal_pinjam'],
+                'tanggal_jatuh_tempo' => $raw['tanggal_jatuh_tempo'],
+                'catatan' => $raw['catatan'] === '' ? null : $raw['catatan'],
+            ],
+            'errors' => $errors,
+        ];
+    }
+
     /** Optional rejection note: trimmed, empty becomes null, max 1000 characters. */
     public function note(mixed $value): ?string
     {

@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Core\Session;
 use App\Core\View;
+use App\Models\Pengaturan;
 use App\Models\Pengembalian;
 use App\Services\Auth;
 use App\Services\PengembalianService;
@@ -16,7 +17,8 @@ final class PengembalianController
         private Session $session,
         private View $view,
         private Pengembalian $returns,
-        private PengembalianService $service
+        private PengembalianService $service,
+        private Pengaturan $pengaturan
     ) {
     }
 
@@ -166,7 +168,7 @@ final class PengembalianController
             'loan' => $loan,
             'values' => $values,
             'errors' => $errors,
-            'tarifDenda' => 0,
+            'tarifDenda' => $this->pengaturan->tarifDenda(),
             'today' => date('Y-m-d'),
             'pageTitle' => 'Verifikasi Pengembalian',
         ], $status);

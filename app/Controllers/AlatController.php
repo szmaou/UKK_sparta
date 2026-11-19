@@ -39,9 +39,18 @@ final class AlatController
             $this->renderForm(null, $parsed['values'], $parsed['errors'], 422);
             return;
         }
+        [$foto, $fotoError] = $this->alat->savePhoto($_FILES['foto'] ?? null);
+        if ($fotoError !== null) {
+            $this->renderForm(null, $parsed['values'], ['foto' => $fotoError], 422);
+            return;
+        }
+        $parsed['values']['foto'] = $foto ?? '';
         try {
             $this->alat->create($parsed['values'], $this->actorId());
         } catch (DomainException $exception) {
+            if ($foto !== null) {
+                $this->alat->deletePhotoFile($foto);
+            }
             $this->renderForm(null, $parsed['values'], ['kode' => $exception->getMessage()], 422);
             return;
         }
@@ -62,6 +71,7 @@ final class AlatController
             'deskripsi' => (string) ($row['deskripsi'] ?? ''),
             'stok_total' => (string) $row['stok_total'],
             'is_active' => (string) $row['is_active'],
+            'foto' => (string) ($row['foto'] ?? ''),
         ]);
     }
     public function update(string $id): void
@@ -71,19 +81,53 @@ final class AlatController
             return;
         }
         $parsed = $this->alat->parse($_POST, (int) $row['id']);
+        $currentFoto = is_string($row['foto'] ?? null) && $row['foto'] !== '' ? (string) $row['foto'] : '';
+        $parsed['values']['foto'] = $currentFoto;
         if ($parsed['errors'] !== []) {
             $this->renderForm($row, $parsed['values'], $parsed['errors'], 422);
             return;
         }
+        $remove = ($parsed['values']['hapus_foto'] ?? '0') === '1';
+        // Save replacement without deleting current photo yet; delete old only after DB commit.
+        [$newFoto, $fotoError] = $this->alat->savePhoto($_FILES['foto'] ?? null, null);
+        if ($fotoError !== null) {
+            $this->renderForm($row, $parsed['values'], ['foto' => $fotoError], 422);
+            return;
+        }
+        $deleteAfterCommit = null;
+        if ($newFoto !== null) {
+            $parsed['values']['foto'] = $newFoto;
+            $deleteAfterCommit = $currentFoto !== '' ? $currentFoto : null;
+        } elseif ($remove && $currentFoto !== '') {
+            $parsed['values']['foto'] = '';
+            $deleteAfterCommit = $currentFoto;
+        } else {
+            // keep existing: don't force change
+            unset($parsed['values']['foto']);
+        }
         try {
             $result = $this->alat->update((int) $row['id'], $parsed['values'], $this->actorId());
         } catch (DomainException $exception) {
-            $this->renderForm($row, $parsed['values'], ['stok_total' => $exception->getMessage()], 422);
+            if ($newFoto !== null) {
+                $this->alat->deletePhotoFile($newFoto);
+            }
+            $this->renderForm($row, $parsed['values'] + ['foto' => $currentFoto], ['stok_total' => $exception->getMessage()], 422);
             return;
+        } catch (\Throwable $exception) {
+            if ($newFoto !== null) {
+                $this->alat->deletePhotoFile($newFoto);
+            }
+            throw $exception;
         }
         if ($result === null) {
+            if ($newFoto !== null) {
+                $this->alat->deletePhotoFile($newFoto);
+            }
             $this->notFound();
             return;
+        }
+        if ($deleteAfterCommit !== null) {
+            $this->alat->deletePhotoFile($deleteAfterCommit);
         }
         $this->session->set('flash_success', 'Alat berhasil diperbarui.');
         redirect('/admin/alat');
@@ -134,6 +178,8 @@ final class AlatController
             'deskripsi' => '',
             'stok_total' => '0',
             'is_active' => '1',
+            'foto' => '',
+            'hapus_foto' => '0',
         ];
     }
     /** @return array<string, mixed>|null */

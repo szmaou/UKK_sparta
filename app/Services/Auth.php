@@ -14,6 +14,12 @@ use App\Models\User;
  */
 final class Auth
 {
+    /**
+     * Verified against when no active account matches, so a failed login costs
+     * the same bcrypt work whether or not the username exists (timing oracle).
+     */
+    private const DUMMY_HASH = '$2y$12$QQ2/OAb6SxhGF7815cadzOot8OlB97mVzKFN5l.AS/YqDhd1G1N4i';
+
     private ?array $user = null;
     private bool $resolved = false;
 
@@ -53,7 +59,8 @@ final class Auth
     public function attempt(string $username, string $password): ?array
     {
         $user = $this->users->findActiveByUsername($username);
-        if ($user === null || !password_verify($password, (string) $user['password_hash'])) {
+        $hash = $user === null ? self::DUMMY_HASH : (string) $user['password_hash'];
+        if (!password_verify($password, $hash) || $user === null) {
             return null;
         }
 

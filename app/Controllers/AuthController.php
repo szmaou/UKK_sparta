@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Core\Session;
 use App\Core\View;
 use App\Models\ActivityLog;
+use App\Models\LoginThrottle;
 use App\Services\Auth;
 
 final class AuthController
@@ -15,7 +16,8 @@ final class AuthController
         private Auth $auth,
         private Session $session,
         private ActivityLog $logs,
-        private View $view
+        private View $view,
+        private LoginThrottle $throttle
     ) {
     }
 
@@ -50,14 +52,30 @@ final class AuthController
             return;
         }
 
+        // Locked accounts skip verification entirely, so a correct password
+        // during the lockout reveals nothing and does not shorten the wait.
+        $locked = $this->throttle->lockedFor($username);
+        if ($locked > 0) {
+            header('Retry-After: ' . $locked);
+            $this->showLogin(
+                'Terlalu banyak percobaan masuk. Coba lagi dalam ' . max(1, (int) ceil($locked / 60)) . ' menit.',
+                429,
+                $username
+            );
+
+            return;
+        }
+
         $user = $this->auth->attempt($username, $password);
         if ($user === null) {
             // Generic message: do not reveal whether the account exists or is inactive.
+            $this->throttle->recordFailure($username);
             $this->showLogin('Username atau kata sandi tidak sesuai.', 401, $username);
 
             return;
         }
 
+        $this->throttle->clear($username);
         $this->auth->login($user);
         $this->logs->record(
             (int) $user['id'],
