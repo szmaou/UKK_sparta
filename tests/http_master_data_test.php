@@ -38,7 +38,7 @@ function check(string $label, bool $ok): void
     }
 }
 /** @return array{status: int, headers: string, body: string} */
-function request(string $base, string $method, string $path, array $post = [], ?string $jar = null): array
+function request(string $base, string $method, string $path, array $post = [], ?string $jar = null, ?array $file = null): array
 {
     $curl = curl_init($base . $path);
     curl_setopt_array($curl, [
@@ -48,7 +48,12 @@ function request(string $base, string $method, string $path, array $post = [], ?
         CURLOPT_TIMEOUT => 10,
         CURLOPT_CUSTOMREQUEST => $method,
     ]);
-    if ($post !== []) {
+    if ($file !== null) {
+        // Multipart is required for uploads; http_build_query cannot carry files.
+        curl_setopt($curl, CURLOPT_POSTFIELDS, $post + [
+            'foto' => new CURLFile($file['path'], $file['type'], $file['name']),
+        ]);
+    } elseif ($post !== []) {
         curl_setopt($curl, CURLOPT_POSTFIELDS, http_build_query($post));
     }
     if ($jar !== null) {
@@ -90,6 +95,13 @@ $seedCounts = [
     'peminjaman' => (int) $db->query("SELECT COUNT(*) FROM peminjaman WHERE kode NOT LIKE 'ITMD-%'")->fetchColumn(),
 ];
 $cleanup = static function () use ($db): void {
+    $photos = $db->query("SELECT foto FROM alat WHERE kode LIKE 'ITMD-%' AND foto IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN);
+    foreach ($photos as $photo) {
+        $path = dirname(__DIR__) . '/public/uploads/alat/' . basename((string) $photo);
+        if (is_file($path)) {
+            @unlink($path);
+        }
+    }
     $db->exec("DELETE FROM activity_logs WHERE entity_type IN ('kategori','alat') AND entity_id IN (
         SELECT id FROM kategori WHERE nama LIKE 'ITMD%'
         UNION SELECT id FROM alat WHERE kode LIKE 'ITMD-%')");
@@ -317,6 +329,83 @@ try {
         && (int) dbValue($db, "SELECT is_active FROM alat WHERE kode = 'ITMD-A8'") === 1);
     check('defaulted status create is audited',
         in_array('create', auditRows($db, 'alat', (int) dbValue($db, "SELECT id FROM alat WHERE kode = 'ITMD-A8'")), true));
+
+    // --- alat photo: content sniffing, stored name, file lifecycle ----------
+    $uploadDir = $root . '/public/uploads/alat';
+    $pngBytes = base64_decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==',
+        true
+    );
+    check('fixture png is a real image', is_string($pngBytes)
+        && getimagesize('data://image/png;base64,' . base64_encode($pngBytes)) !== false);
+    $pngPath = $tmp . '/ITMD-photo.png';
+    $evilPath = $tmp . '/ITMD-evil.png';
+    $brokenPath = $tmp . '/ITMD-broken.png';
+    $hugePath = $tmp . '/ITMD-huge.png';
+    file_put_contents($pngPath, $pngBytes);
+    file_put_contents($evilPath, '<?php echo "pwn"; ?>');
+    file_put_contents($brokenPath, "\x89PNG\r\n\x1a\n");
+    file_put_contents($hugePath, $pngBytes . str_repeat("\0", App\Models\Alat::FOTO_MAX_BYTES));
+    $filesBefore = glob($uploadDir . '/*') ?: [];
+
+    $photoAlat = static fn (string $kode): array => [
+        '_token' => $token, 'kode' => $kode, 'nama' => 'ITMD Foto ' . $kode,
+        'kategori_id' => (string) $catPerkakas, 'stok_total' => '1', 'is_active' => '1',
+    ];
+    $upload = static fn (string $kode, string $path, string $name) => request(
+        $base, 'POST', '/admin/alat/create', $photoAlat($kode), $adminJar,
+        ['path' => $path, 'type' => 'image/png', 'name' => $name]
+    );
+
+    $evil = $upload('ITMD-A6', $evilPath, 'ITMD-evil.png');
+    check('php payload disguised as png is 422', $evil['status'] === 422);
+    check('php payload rejection names accepted formats',
+        str_contains($evil['body'], 'Format foto harus JPG, PNG, atau WebP'));
+    check('php payload inserted no alat', dbValue($db, "SELECT COUNT(*) FROM alat WHERE kode = 'ITMD-A6'") === 0);
+    check('php payload wrote no upload file', (glob($uploadDir . '/*') ?: []) === $filesBefore);
+
+    check('truncated png is 422', $upload('ITMD-A6', $brokenPath, 'ITMD-broken.png')['status'] === 422);
+    check('png above 2 MB is 422', $upload('ITMD-A6', $hugePath, 'ITMD-huge.png')['status'] === 422);
+    check('rejected uploads inserted no alat', dbValue($db, "SELECT COUNT(*) FROM alat WHERE kode = 'ITMD-A6'") === 0);
+
+    $accepted = $upload('ITMD-A5', $pngPath, 'ITMD-photo.png');
+    check('valid png upload redirects to list', $accepted['status'] === 302
+        && str_contains($accepted['headers'], 'Location: /admin/alat'));
+    $photoAlatId = (int) dbValue($db, "SELECT id FROM alat WHERE kode = 'ITMD-A5'");
+    $storedName = (string) dbValue($db, 'SELECT foto FROM alat WHERE id = ?', [$photoAlatId]);
+    check('stored photo uses random 32-hex png name',
+        preg_match('/^[a-f0-9]{32}\.png$/', $storedName) === 1);
+    check('stored photo exists on disk', is_file($uploadDir . '/' . $storedName));
+    check('stored photo keeps the uploaded bytes',
+        is_file($uploadDir . '/' . $storedName) && file_get_contents($uploadDir . '/' . $storedName) === $pngBytes);
+
+    // A correction that uploads a new photo must replace and clean up the old file.
+    $replace = request($base, 'POST', '/admin/alat/' . $photoAlatId . '/edit', [
+        '_token' => $token, 'kode' => 'ITMD-A5', 'nama' => 'ITMD Foto Ubah',
+        'kategori_id' => (string) $catPerkakas, 'stok_total' => '1', 'is_active' => '1',
+    ], $adminJar, ['path' => $pngPath, 'type' => 'image/png', 'name' => 'ITMD-photo.png']);
+    $replacedName = (string) dbValue($db, 'SELECT foto FROM alat WHERE id = ?', [$photoAlatId]);
+    // The file was changed by the server process, so drop the stat cache first.
+    clearstatcache();
+    check('photo replace redirects', $replace['status'] === 302);
+    check('photo replace stores a fresh file', $replacedName !== $storedName
+        && is_file($uploadDir . '/' . $replacedName));
+    check('photo replace deletes the previous file', !is_file($uploadDir . '/' . $storedName));
+
+    $photoDelete = request($base, 'POST', '/admin/alat/' . $photoAlatId . '/delete', ['_token' => $token], $adminJar);
+    clearstatcache();
+    check('deleting alat removes its photo file', $photoDelete['status'] === 302
+        && !is_file($uploadDir . '/' . $replacedName));
+
+    // Stored names are never taken from input, so traversal cannot reach files.
+    $sentinel = $uploadDir . '/ITMD-sentinel.txt';
+    file_put_contents($sentinel, 'keep');
+    $logsModel = new App\Models\ActivityLog($db);
+    (new App\Models\Alat($db, $logsModel, new App\Models\Kategori($db, $logsModel)))
+        ->deletePhotoFile('../ITMD-sentinel.txt');
+    check('photo delete ignores traversal names', is_file($sentinel));
+    @unlink($sentinel);
+
 
     // --- alat search --------------------------------------------------------
     $alatSearch = request($base, 'GET', '/admin/alat?q=ITMD%20Proyektor', [], $adminJar);

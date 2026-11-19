@@ -98,12 +98,21 @@ $roleRoute = $roleRouter->match('GET', '/admin/dashboard');
 check('admin route requires admin role', $roleRoute['roles'] === ['admin']);
 check('role list excludes other roles', !in_array('peminjam', $roleRoute['roles'], true));
 
+// --- Login timing equalisation --------------------------------------------
+$authHash = (new ReflectionClassConstant(App\Services\Auth::class, 'DUMMY_HASH'))->getValue();
+$authInfo = password_get_info($authHash);
+$defaultCost = password_get_info(password_hash('x', PASSWORD_DEFAULT))['options']['cost'];
+check('dummy hash is bcrypt', $authInfo['algoName'] === 'bcrypt');
+check('dummy hash cost matches PASSWORD_DEFAULT', ($authInfo['options']['cost'] ?? 0) === $defaultCost);
+check('dummy hash never verifies', !password_verify('sparta-wrong-password', $authHash));
+
 // --- View -----------------------------------------------------------------
 $view = new App\Core\View($root . '/app/Views');
 $viewFile = $root . '/app/Views/' . 'auth/login.php';
 check('login view exists', is_file($viewFile));
 check('dashboard view exists', is_file($root . '/app/Views/dashboard.php'));
 check('403 view exists', is_file($root . '/app/Views/errors/403.php'));
+check('404 view exists', is_file($root . '/app/Views/errors/404.php'));
 check('500 view exists', is_file($root . '/app/Views/errors/500.php'));
 check('view class loads', $view instanceof App\Core\View);
 

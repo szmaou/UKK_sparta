@@ -72,10 +72,10 @@ applySql($db, $root . '/database/schema.sql');
 applySql($db, $root . '/database/routines.sql');
 
 // --- Structure ---------------------------------------------------------------
-$expectedTables = ['users', 'kategori', 'alat', 'peminjaman', 'pengembalian', 'activity_logs'];
+$expectedTables = ['users', 'kategori', 'alat', 'peminjaman', 'pengembalian', 'pengaturan', 'activity_logs', 'login_attempts'];
 $tables = $db->query(
     "SELECT table_name, engine FROM information_schema.tables
-     WHERE table_schema = DATABASE() AND table_name IN ('users','kategori','alat','peminjaman','pengembalian','activity_logs')"
+     WHERE table_schema = DATABASE() AND table_name IN ('users','kategori','alat','peminjaman','pengembalian','pengaturan','activity_logs','login_attempts')"
 )->fetchAll(PDO::FETCH_KEY_PAIR);
 foreach ($expectedTables as $table) {
     check("table {$table} exists with InnoDB", ($tables[$table] ?? null) === 'InnoDB');

@@ -34,9 +34,19 @@ $accounts = [
     'it_petugas' => ['petugas', 1],
     'it_peminjam' => ['peminjam', 1],
     'it_inactive' => ['admin', 0],
+    'it_throttle' => ['peminjam', 1],
 ];
 $usernames = array_keys($accounts);
 $in = implode(',', array_fill(0, count($usernames), '?'));
+$throttleKeys = array_map(
+    static fn (string $username): string => App\Models\LoginThrottle::key($username),
+    array_merge($usernames, ['it_ghost', 'nobody-here'])
+);
+$clearThrottle = static function () use ($db, $throttleKeys): void {
+    $marks = implode(',', array_fill(0, count($throttleKeys), '?'));
+    $db->prepare("DELETE FROM login_attempts WHERE username_hash IN ($marks)")->execute($throttleKeys);
+};
+$clearThrottle();
 $db->prepare("DELETE FROM activity_logs WHERE user_id IN (SELECT id FROM users WHERE username IN ($in))")
     ->execute($usernames);
 $db->prepare("DELETE FROM users WHERE username IN ($in)")->execute($usernames);
@@ -180,6 +190,13 @@ try {
     check('unknown username is rejected', $unknown['status'] === 401);
     check('unknown error matches generic error', str_contains($unknown['body'], 'Username atau kata sandi tidak sesuai'));
 
+    $hasStat = static function (string $body, string $label, int $value): bool {
+        return preg_match(
+            '/stat-title">' . preg_quote($label, '/') . '<\\/div>.*?stat-value[^>]*>' . $value . '<\\/div>/s',
+            $body
+        ) === 1;
+    };
+
     // --- role logins + dashboards ---
     $admin = login($base, $adminJar, 'it_admin', $password);
     check('admin login redirects to admin dashboard', $admin['status'] === 302
@@ -188,6 +205,17 @@ try {
     $adminDashboard = request($base, 'GET', '/admin/dashboard', [], $adminJar);
     check('admin dashboard is 200', $adminDashboard['status'] === 200);
     check('admin dashboard greets user', str_contains($adminDashboard['body'], 'It_admin'));
+    $adminCounts = $db->query(
+        "SELECT
+            (SELECT COUNT(*) FROM alat WHERE is_active = 1) AS alat_aktif,
+            (SELECT COUNT(*) FROM users WHERE is_active = 1) AS pengguna_aktif,
+            (SELECT COUNT(*) FROM peminjaman WHERE status IN ('approved','return_requested')) AS peminjaman_aktif,
+            (SELECT COUNT(*) FROM peminjaman WHERE status = 'pending') AS menunggu_persetujuan"
+    )->fetch(PDO::FETCH_ASSOC) ?: [];
+    check('admin dashboard shows alat aktif KPI', $hasStat($adminDashboard['body'], 'Alat aktif', (int) ($adminCounts['alat_aktif'] ?? 0)));
+    check('admin dashboard shows pengguna aktif KPI', $hasStat($adminDashboard['body'], 'Pengguna aktif', (int) ($adminCounts['pengguna_aktif'] ?? 0)));
+    check('admin dashboard shows peminjaman aktif KPI', $hasStat($adminDashboard['body'], 'Peminjaman aktif', (int) ($adminCounts['peminjaman_aktif'] ?? 0)));
+    check('admin dashboard shows menunggu persetujuan KPI', $hasStat($adminDashboard['body'], 'Menunggu persetujuan', (int) ($adminCounts['menunggu_persetujuan'] ?? 0)));
 
     $adminHome = request($base, 'GET', '/', [], $adminJar);
     check('GET / sends admin to own dashboard', $adminHome['status'] === 302
@@ -201,12 +229,46 @@ try {
     $petugas = login($base, $petugasJar, 'it_petugas', $password);
     check('petugas login redirects to petugas dashboard', $petugas['status'] === 302
         && str_contains($petugas['headers'], 'Location: /petugas/dashboard'));
-    check('petugas dashboard is 200', request($base, 'GET', '/petugas/dashboard', [], $petugasJar)['status'] === 200);
+    $petugasDashboard = request($base, 'GET', '/petugas/dashboard', [], $petugasJar);
+    check('petugas dashboard is 200', $petugasDashboard['status'] === 200);
+    $petugasCounts = $db->query(
+        "SELECT
+            COALESCE(SUM(status = 'pending'), 0) AS menunggu_persetujuan,
+            COALESCE(SUM(status = 'approved'), 0) AS sedang_dipinjam,
+            COALESCE(SUM(status = 'return_requested'), 0) AS menunggu_verifikasi,
+            COALESCE(SUM(status = 'approved' AND tanggal_jatuh_tempo < CURDATE()), 0) AS terlambat
+         FROM peminjaman"
+    )->fetch(PDO::FETCH_ASSOC) ?: [];
+    check('petugas dashboard shows menunggu persetujuan KPI', $hasStat($petugasDashboard['body'], 'Menunggu persetujuan', (int) ($petugasCounts['menunggu_persetujuan'] ?? 0)));
+    check('petugas dashboard shows sedang dipinjam KPI', $hasStat($petugasDashboard['body'], 'Sedang dipinjam', (int) ($petugasCounts['sedang_dipinjam'] ?? 0)));
+    check('petugas dashboard shows menunggu verifikasi KPI', $hasStat($petugasDashboard['body'], 'Menunggu verifikasi', (int) ($petugasCounts['menunggu_verifikasi'] ?? 0)));
+    check('petugas dashboard shows terlambat KPI', $hasStat($petugasDashboard['body'], 'Terlambat', (int) ($petugasCounts['terlambat'] ?? 0)));
 
     $peminjam = login($base, $peminjamJar, 'it_peminjam', $password);
     check('peminjam login redirects to peminjam dashboard', $peminjam['status'] === 302
         && str_contains($peminjam['headers'], 'Location: /peminjam/dashboard'));
-    check('peminjam dashboard is 200', request($base, 'GET', '/peminjam/dashboard', [], $peminjamJar)['status'] === 200);
+    $peminjamDashboard = request($base, 'GET', '/peminjam/dashboard', [], $peminjamJar);
+    check('peminjam dashboard is 200', $peminjamDashboard['status'] === 200);
+    $peminjamId = (int) $db->query("SELECT id FROM users WHERE username = 'it_peminjam'")->fetchColumn();
+    $ownCounts = $db->prepare(
+        "SELECT
+            COALESCE(SUM(status = 'pending'), 0) AS menunggu_persetujuan,
+            COALESCE(SUM(status = 'approved'), 0) AS disetujui,
+            COALESCE(SUM(status = 'return_requested'), 0) AS menunggu_verifikasi,
+            COALESCE(SUM(status = 'returned'), 0) AS selesai
+         FROM peminjaman
+         WHERE user_id = :user_id"
+    );
+    $ownCounts->execute([':user_id' => $peminjamId]);
+    $own = $ownCounts->fetch(PDO::FETCH_ASSOC) ?: [];
+    check('peminjam dashboard shows menunggu persetujuan KPI', $hasStat($peminjamDashboard['body'], 'Menunggu persetujuan', (int) ($own['menunggu_persetujuan'] ?? 0)));
+    check('peminjam dashboard shows disetujui KPI', $hasStat($peminjamDashboard['body'], 'Disetujui', (int) ($own['disetujui'] ?? 0)));
+    check('peminjam dashboard shows menunggu verifikasi KPI', $hasStat($peminjamDashboard['body'], 'Menunggu verifikasi', (int) ($own['menunggu_verifikasi'] ?? 0)));
+    check('peminjam dashboard shows selesai KPI', $hasStat($peminjamDashboard['body'], 'Selesai', (int) ($own['selesai'] ?? 0)));
+    check('peminjam dashboard hides admin metrics',
+        !str_contains($peminjamDashboard['body'], 'Alat aktif')
+        && !str_contains($peminjamDashboard['body'], 'Pengguna aktif')
+        && !str_contains($peminjamDashboard['body'], 'Peminjaman aktif'));
 
     $peminjamOnAdmin = request($base, 'GET', '/admin/dashboard', [], $peminjamJar);
     check('peminjam on admin dashboard is 403', $peminjamOnAdmin['status'] === 403);
@@ -231,6 +293,40 @@ try {
     check('deactivated user is rejected mid-session',
         request($base, 'GET', '/petugas/dashboard', [], $petugasJar)['status'] === 302);
     $db->prepare("UPDATE users SET is_active = 1 WHERE username = 'it_petugas'")->execute();
+
+    // --- failed-login lockout -------------------------------------------------
+    $throttleJar = $tmp . '/throttle.cookies';
+    $codes = [];
+    for ($i = 1; $i <= 5; $i++) {
+        $codes[] = login($base, $throttleJar, 'it_throttle', 'wrong-' . $i)['status'];
+    }
+    check('first five failures answer 401', $codes === [401, 401, 401, 401, 401]);
+    $locked = login($base, $throttleJar, 'it_throttle', 'wrong-6');
+    check('sixth attempt is locked out', $locked['status'] === 429);
+    check('lockout page explains the wait', str_contains($locked['body'], 'Terlalu banyak percobaan masuk'));
+    check('locked response sets Retry-After', preg_match('/Retry-After: \d+/', $locked['headers']) === 1);
+    check('correct password is refused during lockout',
+        login($base, $throttleJar, 'it_throttle', $password)['status'] === 429);
+
+    $past = date('Y-m-d H:i:s', time() - 3600);
+    $db->prepare('UPDATE login_attempts SET window_start = ?, blocked_until = ? WHERE username_hash = ?')
+        ->execute([$past, $past, App\Models\LoginThrottle::key('it_throttle')]);
+    $recovered = login($base, $tmp . '/throttle2.cookies', 'it_throttle', $password);
+    check('expired lockout allows a correct login', $recovered['status'] === 302);
+    $remaining = $db->prepare('SELECT COUNT(*) FROM login_attempts WHERE username_hash = ?');
+    $remaining->execute([App\Models\LoginThrottle::key('it_throttle')]);
+    check('successful login clears the counter', (int) $remaining->fetchColumn() === 0);
+
+    // Unknown usernames must be throttled the same way, or the lockout itself
+    // would reveal which accounts exist.
+    $ghostCodes = [];
+    for ($i = 1; $i <= 5; $i++) {
+        $ghostCodes[] = login($base, $tmp . '/ghost.cookies', 'it_ghost', 'nope-' . $i)['status'];
+    }
+    check('unknown username failures answer 401', $ghostCodes === [401, 401, 401, 401, 401]);
+    $ghostLocked = login($base, $tmp . '/ghost.cookies', 'it_ghost', 'nope-6');
+    check('unknown username is locked out too', $ghostLocked['status'] === 429
+        && str_contains($ghostLocked['body'], 'Terlalu banyak percobaan masuk'));
 
     // --- logout requires CSRF even for a logged-in user ---
     $csrfLogoutJar = $tmp . '/csrf-logout.cookies';
@@ -303,6 +399,7 @@ try {
     $db->prepare("DELETE FROM activity_logs WHERE user_id IN (SELECT id FROM users WHERE username IN ($in))")
         ->execute($usernames);
     $db->prepare("DELETE FROM users WHERE username IN ($in)")->execute($usernames);
+    $clearThrottle();
 }
 
 printf("%d checks, %d failed\n", $checks, count($failures));

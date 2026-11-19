@@ -48,6 +48,9 @@ function applyRoutines(PDO $db, string $file): void
     }
 }
 applyRoutines($db, $root . '/database/routines.sql');
+// Tests own the global tariff row; always start from the zero default.
+$db->exec("INSERT INTO pengaturan (kunci, nilai) VALUES ('tarif_denda', '0')
+           ON DUPLICATE KEY UPDATE nilai = '0'");
 
 $checks = 0;
 $failures = [];
@@ -287,6 +290,22 @@ try {
     $pToken = csrfFrom(request($base, 'GET', '/peminjam/peminjaman', [], $jar1)['body']);
     $pToken2 = csrfFrom(request($base, 'GET', '/peminjam/peminjaman', [], $jar2)['body']);
     $petugasToken = csrfFrom(request($base, 'GET', '/petugas/persetujuan', [], $petugasJar)['body']);
+    // --- configurable fine tariff -----------------------------------------
+    $settingsPage = request($base, 'GET', '/admin/pengaturan', [], $adminJar);
+    check('admin settings page renders configurable fine tariff',
+        $settingsPage['status'] === 200 && str_contains($settingsPage['body'], 'name="tarif_denda"'));
+    check('peminjam cannot open admin settings',
+        request($base, 'GET', '/admin/pengaturan', [], $jar1)['status'] === 403);
+    $adminToken = csrfFrom($settingsPage['body']);
+    check('settings reject tariff above the maximum',
+        request($base, 'POST', '/admin/pengaturan',
+            ['_token' => $adminToken, 'tarif_denda' => '1000001'], $adminJar)['status'] === 422);
+    check('admin can save a new tariff',
+        request($base, 'POST', '/admin/pengaturan',
+            ['_token' => $adminToken, 'tarif_denda' => '1000'], $adminJar)['status'] === 302
+        && dbValue($db, "SELECT nilai FROM pengaturan WHERE kunci = 'tarif_denda'") === '1000');
+    request($base, 'POST', '/admin/pengaturan',
+        ['_token' => $adminToken, 'tarif_denda' => '0'], $adminJar);
 
     // --- shared page contract ----------------------------------------------
     $borrowerPage = request($base, 'GET', '/peminjam/pengembalian', [], $jar1);
@@ -393,8 +412,8 @@ try {
         && (int) $received['hari_terlambat'] === 2 && (float) $received['denda'] === 0.0
         && $received['tanggal_diterima'] === '2026-09-12 00:00:00'
         && (int) $received['verified_by'] === $petugas);
-    check('damaged/lost full return restores full borrowed stock',
-        (int) dbValue($db, 'SELECT stok_tersedia FROM alat WHERE id = ?', [$tools[3]]) === 2
+    check('damaged/lost return restores no available stock',
+        (int) dbValue($db, 'SELECT stok_tersedia FROM alat WHERE id = ?', [$tools[3]]) === 0
         && dbValue($db, 'SELECT status FROM peminjaman WHERE id = ?', [$loanIds[3]]) === 'returned');
     check('verification writes one trigger status audit by Petugas',
         statusAuditCount($db, $loanIds[3]) === 1
@@ -429,13 +448,34 @@ try {
         (int) dbValue($db, 'SELECT stok_tersedia FROM alat WHERE id = ?', [$tools[4]]) === $beforeDuplicateStock
         && statusAuditCount($db, $loanIds[4]) === $beforeDuplicateAudit);
 
+    $db->prepare("UPDATE pengaturan SET nilai = '1000' WHERE kunci = 'tarif_denda'")->execute();
     request($base, 'POST', '/petugas/pengembalian/' . $loanIds[5] . '/verify', [
         '_token' => $petugasToken, 'tanggal_diterima' => '2026-02-08', 'kondisi' => 'rusak_berat',
     ], $petugasJar);
     $late = $db->query('SELECT * FROM pengembalian WHERE peminjaman_id = ' . $loanIds[5])->fetch();
-    check('late return adds full quantity despite damaged condition', (int) $late['hari_terlambat'] === 3
-        && (float) $late['denda'] === 0.0 && (int) dbValue($db,
-            'SELECT stok_tersedia FROM alat WHERE id = ?', [$tools[5]]) === 5);
+    check('late return applies configured tariff (3 days x 2 units x Rp1.000)', (int) $late['hari_terlambat'] === 3
+        && (float) $late['denda'] === 6000.0 && (int) dbValue($db,
+            'SELECT stok_tersedia FROM alat WHERE id = ?', [$tools[5]]) === 3);
+    check('later tariff changes do not rewrite stored fine', (static function () use ($db, $loanIds): bool {
+        $db->prepare("UPDATE pengaturan SET nilai = '0' WHERE kunci = 'tarif_denda'")->execute();
+        return (float) dbValue($db, 'SELECT denda FROM pengembalian WHERE peminjaman_id = ?', [$loanIds[5]]) === 6000.0;
+    })());
+    // --- admin correction keeps stock in sync with condition ----------------
+    $returnsFix = new App\Models\Pengembalian(
+        $db,
+        new App\Models\Pengaturan($db, new App\Models\ActivityLog($db))
+    );
+    check('correction to baik restores the borrowed quantity',
+        $returnsFix->adminUpdate($loanIds[5], '2026-02-08', 'baik', $petugas) === 'updated'
+        && (int) dbValue($db, 'SELECT stok_tersedia FROM alat WHERE id = ?', [$tools[5]]) === 5);
+    check('correction to hilang removes the borrowed quantity again',
+        $returnsFix->adminUpdate($loanIds[5], '2026-02-08', 'hilang', $petugas) === 'updated'
+        && (int) dbValue($db, 'SELECT stok_tersedia FROM alat WHERE id = ?', [$tools[5]]) === 3);
+    $db->prepare('UPDATE alat SET stok_tersedia = stok_total WHERE id = ?')->execute([$tools[5]]);
+    check('correction cannot push available stock past the total',
+        $returnsFix->adminUpdate($loanIds[5], '2026-02-08', 'baik', $petugas) === 'stock_conflict'
+        && (int) dbValue($db, 'SELECT stok_tersedia FROM alat WHERE id = ?', [$tools[5]]) === 5
+        && dbValue($db, 'SELECT kondisi FROM pengembalian WHERE peminjaman_id = ?', [$loanIds[5]]) === 'hilang');
 
     // --- invalid verification input ----------------------------------------
     $service = new App\Services\PengembalianService();
@@ -445,7 +485,10 @@ try {
     check('status filter falls back to active', $service->statusFilter('bogus') === 'active'
         && $service->statusFilter('returned') === 'returned');
 
-    $returns = new App\Models\Pengembalian($db);
+    $returns = new App\Models\Pengembalian(
+        $db,
+        new App\Models\Pengaturan($db, new App\Models\ActivityLog($db))
+    );
     $stockBeforeInvalid = (int) dbValue($db, 'SELECT stok_tersedia FROM alat WHERE id = ?', [$tools[6]]);
     $auditBeforeInvalid = statusAuditCount($db, $loanIds[6]);
     foreach ([
