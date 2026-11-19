@@ -578,7 +578,7 @@ Semua BR merupakan **[Rancangan]**, ditetapkan untuk membuat fitur UKK konsisten
 | TC-06 | Petugas menyetujui pending | Status `approved`, stok berkurang tepat sekali |
 | TC-07 | Dua persetujuan bersamaan atas stok terakhir | Maksimum satu berhasil; stok tidak negatif |
 | TC-08 | Peminjam mengajukan pengembalian | Status `return_requested`, stok belum bertambah |
-| TC-09 | Petugas memverifikasi pengembalian | Status `returned`, stok bertambah tepat sekali |
+| TC-09 | Petugas memverifikasi pengembalian | Status `returned`, stok bertambah tepat sekali bila kondisi `baik`; `rusak_ringan`/`rusak_berat`/`hilang` tidak menambah stok |
 | TC-10 | Pengembalian terlambat (jika tarif aktif) | Hari terlambat dan denda benar |
 | TC-11 | Peminjam membuka URL Admin | HTTP 403, data tidak bocor |
 | TC-12 | Petugas mencoba CRUD alat via POST | HTTP 403, data alat tidak berubah |
