@@ -63,4 +63,5 @@ button, input { font: inherit; }
 
 @media (min-width: 1024px) {
   .drawer-open > .drawer-toggle ~ .drawer-side { width: var(--sidebar-width); }
+  .drawer-side .drawer-overlay { display: none; }
 }

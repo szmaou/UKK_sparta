@@ -15,14 +15,15 @@ $activeNav = 'alat';
 $action = $isEdit ? '/admin/alat/' . rawurlencode($id) . '/edit' : '/admin/alat/create';
 $fieldError = static fn (string $field): string => isset($errors[$field]) ? (string) $errors[$field] : '';
 $activeValue = (string) ($values['is_active'] ?? '1');
+$currentFoto = trim((string) ($values['foto'] ?? ''));
 
 ob_start();
 ?>
 <div class="mx-auto max-w-4xl space-y-6">
-    <div><a href="/admin/alat" class="btn btn-ghost btn-sm -ml-3">← Kembali ke data alat</a><h2 class="mt-3 text-3xl font-black tracking-tight"><?= e($pageTitle) ?></h2><p class="mt-2 text-slate-600"><?= $isEdit ? 'Perbarui data master dan status alat.' : 'Tambahkan alat baru ke inventaris sekolah.' ?></p></div>
+    <div><a href="/admin/alat" class="btn btn-ghost btn-sm -ml-3">← Kembali ke data alat</a><h2 class="mt-3 text-3xl font-black tracking-tight"><?= e($pageTitle) ?></h2><p class="mt-2 text-slate-600"><?= $isEdit ? 'Perbarui data master, foto, dan status alat.' : 'Tambahkan alat baru ke inventaris sekolah.' ?></p></div>
     <?php if (!empty($error)): ?><div role="alert" class="alert alert-error alert-soft"><span class="app-icon" aria-hidden="true"><?= icon('triangle-exclamation-point') ?></span><span><?= e($error) ?></span></div><?php endif; ?>
 
-    <form method="post" action="<?= e($action) ?>" class="card border border-base-300 bg-base-100 shadow-sm">
+    <form method="post" action="<?= e($action) ?>" enctype="multipart/form-data" class="card border border-base-300 bg-base-100 shadow-sm">
         <input type="hidden" name="_token" value="<?= e($csrfToken) ?>">
         <fieldset class="fieldset card-body gap-5 p-5 sm:p-7">
             <legend class="sr-only">Data alat</legend>
@@ -51,13 +52,36 @@ ob_start();
                 </div>
             </div>
 
-            <label class="fieldset-label font-semibold" for="deskripsi">Deskripsi <span class="font-normal text-slate-500">(opsional)</span></label>
-            <textarea id="deskripsi" name="deskripsi" maxlength="1000" rows="5" class="textarea w-full <?= $fieldError('deskripsi') !== '' ? 'textarea-error' : '' ?>" aria-describedby="deskripsi-help<?= $fieldError('deskripsi') !== '' ? ' deskripsi-error' : '' ?>" aria-invalid="<?= $fieldError('deskripsi') !== '' ? 'true' : 'false' ?>"><?= e((string) ($values['deskripsi'] ?? '')) ?></textarea>
-            <p id="deskripsi-help" class="fieldset-label text-slate-500">Catatan spesifikasi atau penggunaan. Maksimal 1.000 karakter.</p><?php if ($fieldError('deskripsi') !== ''): ?><p id="deskripsi-error" class="text-sm font-medium text-red-700"><?= e($fieldError('deskripsi')) ?></p><?php endif; ?>
+            <div>
+                <label class="fieldset-label font-semibold" for="deskripsi">Deskripsi <span class="font-normal text-slate-500">(opsional)</span></label>
+                <textarea id="deskripsi" name="deskripsi" maxlength="1000" rows="5" class="textarea mt-2 w-full <?= $fieldError('deskripsi') !== '' ? 'textarea-error' : '' ?>" aria-describedby="deskripsi-help<?= $fieldError('deskripsi') !== '' ? ' deskripsi-error' : '' ?>" aria-invalid="<?= $fieldError('deskripsi') !== '' ? 'true' : 'false' ?>"><?= e((string) ($values['deskripsi'] ?? '')) ?></textarea>
+                <p id="deskripsi-help" class="mt-2 text-xs text-slate-500">Catatan spesifikasi atau penggunaan. Maksimal 1.000 karakter.</p><?php if ($fieldError('deskripsi') !== ''): ?><p id="deskripsi-error" class="mt-2 text-sm font-medium text-red-700"><?= e($fieldError('deskripsi')) ?></p><?php endif; ?>
+            </div>
 
-            <label class="fieldset-label font-semibold" for="is_active">Status alat <span class="text-red-700">*</span></label>
-            <select id="is_active" name="is_active" required class="select w-full sm:max-w-xs <?= $fieldError('is_active') !== '' ? 'select-error' : '' ?>" aria-describedby="status-help<?= $fieldError('is_active') !== '' ? ' status-error' : '' ?>" aria-invalid="<?= $fieldError('is_active') !== '' ? 'true' : 'false' ?>"><option value="1" <?= $activeValue === '1' ? 'selected' : '' ?>>Aktif</option><option value="0" <?= $activeValue === '0' ? 'selected' : '' ?>>Nonaktif</option></select>
-            <p id="status-help" class="fieldset-label text-slate-500">Alat nonaktif tetap tersimpan, tetapi tidak tersedia untuk transaksi baru.</p><?php if ($fieldError('is_active') !== ''): ?><p id="status-error" class="text-sm font-medium text-red-700"><?= e($fieldError('is_active')) ?></p><?php endif; ?>
+            <div>
+                <label class="fieldset-label font-semibold" for="foto">Foto alat <span class="font-normal text-slate-500">(opsional)</span></label>
+                <?php if ($isEdit && $currentFoto !== ''): ?>
+                    <div class="mt-3 flex items-start gap-4 rounded-xl border border-base-300 bg-base-200/40 p-3">
+                        <img src="/uploads/alat/<?= rawurlencode($currentFoto) ?>" alt="Foto <?= e((string) ($values['nama'] ?? 'alat')) ?>" class="h-24 w-24 rounded-lg border border-base-300 bg-base-100 object-cover">
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium text-slate-700">Foto saat ini</p>
+                            <label class="mt-2 flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+                                <input type="checkbox" name="hapus_foto" value="1" class="checkbox checkbox-sm">
+                                Hapus foto ini
+                            </label>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                <input id="foto" name="foto" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" class="file-input mt-2 w-full sm:max-w-md <?= $fieldError('foto') !== '' ? 'file-input-error' : '' ?>" aria-describedby="foto-help<?= $fieldError('foto') !== '' ? ' foto-error' : '' ?>" aria-invalid="<?= $fieldError('foto') !== '' ? 'true' : 'false' ?>">
+                <p id="foto-help" class="mt-2 text-xs text-slate-500">JPG, PNG, atau WebP. Maksimal 2 MB.<?= $isEdit && $currentFoto !== '' ? ' Unggah file baru untuk mengganti foto.' : '' ?></p>
+                <?php if ($fieldError('foto') !== ''): ?><p id="foto-error" class="mt-2 text-sm font-medium text-red-700"><?= e($fieldError('foto')) ?></p><?php endif; ?>
+            </div>
+
+            <div>
+                <label class="fieldset-label font-semibold" for="is_active">Status alat <span class="text-red-700">*</span></label>
+                <select id="is_active" name="is_active" required class="select mt-2 w-full sm:max-w-xs <?= $fieldError('is_active') !== '' ? 'select-error' : '' ?>" aria-describedby="status-help<?= $fieldError('is_active') !== '' ? ' status-error' : '' ?>" aria-invalid="<?= $fieldError('is_active') !== '' ? 'true' : 'false' ?>"><option value="1" <?= $activeValue === '1' ? 'selected' : '' ?>>Aktif</option><option value="0" <?= $activeValue === '0' ? 'selected' : '' ?>>Nonaktif</option></select>
+                <p id="status-help" class="mt-2 text-xs text-slate-500">Alat nonaktif tetap tersimpan, tetapi tidak tersedia untuk transaksi baru.</p><?php if ($fieldError('is_active') !== ''): ?><p id="status-error" class="mt-2 text-sm font-medium text-red-700"><?= e($fieldError('is_active')) ?></p><?php endif; ?>
+            </div>
 
             <div class="mt-2 flex flex-col-reverse gap-3 border-t border-base-300 pt-5 sm:flex-row sm:justify-end"><a href="/admin/alat" class="btn btn-ghost">Batal</a><button type="submit" class="btn btn-primary"><?= $isEdit ? 'Simpan Perubahan' : 'Simpan Alat' ?></button></div>
         </fieldset>

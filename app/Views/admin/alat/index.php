@@ -48,9 +48,24 @@ ob_start();
                         <thead><tr><th>Kode dan alat</th><th>Kategori</th><th class="text-right">Total</th><th class="text-right">Tersedia</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
                         <tbody>
                         <?php foreach ($items as $item): ?>
-                            <?php $active = (string) ($item['is_active'] ?? '0') === '1'; ?>
+                            <?php
+                            $active = (string) ($item['is_active'] ?? '0') === '1';
+                            $foto = trim((string) ($item['foto'] ?? ''));
+                            ?>
                             <tr>
-                                <td><p class="font-semibold"><?= e((string) ($item['nama'] ?? '')) ?></p><p class="mt-1 font-mono text-xs text-slate-500"><?= e((string) ($item['kode'] ?? '')) ?></p></td>
+                                <td>
+                                    <div class="flex items-center gap-3">
+                                        <?php if ($foto !== ''): ?>
+                                            <img src="/uploads/alat/<?= rawurlencode($foto) ?>" alt="" class="h-12 w-12 shrink-0 rounded-lg border border-base-300 bg-base-100 object-cover">
+                                        <?php else: ?>
+                                            <span class="app-icon grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-base-300 bg-base-200/60 text-slate-400" aria-hidden="true"><?= icon('image') ?></span>
+                                        <?php endif; ?>
+                                        <div class="min-w-0">
+                                            <p class="font-semibold"><?= e((string) ($item['nama'] ?? '')) ?></p>
+                                            <p class="mt-1 font-mono text-xs text-slate-500"><?= e((string) ($item['kode'] ?? '')) ?></p>
+                                        </div>
+                                    </div>
+                                </td>
                                 <td><?= e((string) ($item['kategori_nama'] ?? '—')) ?></td>
                                 <td class="text-right tabular-nums"><?= e((string) ($item['stok_total'] ?? 0)) ?></td>
                                 <td class="text-right tabular-nums"><span class="font-semibold"><?= e((string) ($item['stok_tersedia'] ?? 0)) ?></span><span class="block text-xs text-slate-500"><?= e((string) ($item['stok_dipinjam'] ?? 0)) ?> dipinjam</span></td>

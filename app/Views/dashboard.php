@@ -2,8 +2,10 @@
 /** @var array|null $user */
 /** @var string $csrfToken */
 /** @var string $role */
+/** @var list<array{label: string, value: int, href: string, desc: string}> $stats */
 
 $user = is_array($user ?? null) ? $user : [];
+$stats = is_array($stats ?? null) ? $stats : [];
 $currentRole = strtolower((string) ($role ?? $user['role'] ?? 'peminjam'));
 $name = (string) ($user['name'] ?? $user['username'] ?? 'Pengguna');
 $roleCopy = [
@@ -12,24 +14,21 @@ $roleCopy = [
         'intro' => 'Kelola data sekolah dari satu ruang kerja yang rapi.',
         'icon' => 'users',
         'title' => 'Ruang kelola Admin',
-        'body' => 'Kelola kategori dan alat dari menu inventaris. Modul lain tetap ditandai sesuai ketersediaannya.',
-        'modules' => ['Pengguna', 'Kategori & alat', 'Transaksi', 'Log aktivitas'],
+        'body' => 'Pantau ringkasan sistem dan kelola data sekolah dari menu inventaris.',
     ],
     'petugas' => [
         'label' => 'Petugas',
         'intro' => 'Tinjau alur peminjaman dan pengembalian dengan jelas.',
         'icon' => 'square-check',
         'title' => 'Ruang kerja Petugas',
-        'body' => 'Kelola persetujuan peminjaman dan verifikasi fisik pengembalian barang.',
-        'modules' => ['Persetujuan', 'Pengembalian', 'Laporan'],
+        'body' => 'Pantau antrean persetujuan, verifikasi pengembalian, dan keterlambatan.',
     ],
     'peminjam' => [
         'label' => 'Peminjam',
         'intro' => 'Temukan alat sekolah dan pantau pengajuan Anda.',
         'icon' => 'search',
         'title' => 'Ruang pinjam Anda',
-        'body' => 'Jelajahi katalog alat, pantau riwayat pinjam, dan ajukan pengembalian tepat waktu.',
-        'modules' => ['Katalog alat', 'Peminjaman saya', 'Pengembalian'],
+        'body' => 'Pantau status pengajuan dan kelola peminjaman Anda dari satu tempat.',
     ],
 ];
 $copy = $roleCopy[$currentRole] ?? $roleCopy['peminjam'];
@@ -37,8 +36,8 @@ $pageTitle = 'Dashboard';
 
 ob_start();
 ?>
-<div class="mx-auto max-w-7xl">
-    <section class="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+<div class="mx-auto max-w-7xl space-y-6">
+    <section class="flex flex-col justify-between gap-5 md:flex-row md:items-end">
         <div>
             <span class="badge border-indigo-200 bg-indigo-50 font-semibold text-indigo-800"><?= e($copy['label']) ?></span>
             <h2 class="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Selamat datang, <?= e($name) ?></h2>
@@ -47,29 +46,24 @@ ob_start();
         <p class="text-sm text-slate-500">Ruang kerja <?= e($copy['label']) ?></p>
     </section>
 
+    <?php if ($stats !== []): ?>
+        <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Ringkasan">
+            <?php foreach ($stats as $stat): ?>
+                <a href="<?= e((string) ($stat['href'] ?? '#')) ?>" class="stat rounded-xl border border-base-300 bg-base-100 shadow-sm transition hover:border-indigo-200 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+                    <div class="stat-title"><?= e((string) ($stat['label'] ?? '')) ?></div>
+                    <div class="stat-value text-2xl tabular-nums"><?= e((string) ($stat['value'] ?? 0)) ?></div>
+                    <div class="stat-desc whitespace-normal text-slate-500"><?= e((string) ($stat['desc'] ?? '')) ?></div>
+                </a>
+            <?php endforeach; ?>
+        </section>
+    <?php endif; ?>
+
     <section class="grid gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(18rem,0.75fr)]">
         <article class="card overflow-hidden border border-base-300 bg-base-100 shadow-sm">
             <div class="card-body p-6 sm:p-8">
                 <div class="mb-6 grid size-12 place-items-center rounded-xl bg-indigo-50 text-indigo-700 app-icon" aria-hidden="true"><?= icon($copy['icon']) ?></div>
                 <h3 class="card-title text-2xl font-bold"><?= e($copy['title']) ?></h3>
                 <p class="mt-2 max-w-2xl text-slate-600"><?= e($copy['body']) ?></p>
-
-                <div class="mt-8 grid gap-3 sm:grid-cols-2">
-                    <?php foreach ($copy['modules'] as $module): ?>
-                        <div class="flex items-center justify-between gap-3 rounded-xl border border-base-300 bg-base-200/60 p-4">
-                            <div class="flex min-w-0 items-center gap-3">
-                                <span class="app-icon text-slate-500" aria-hidden="true"><?= icon('wrench') ?></span>
-                                <span class="truncate font-semibold"><?= e($module) ?></span>
-                            </div>
-                            <?php
-                            $moduleReady = ($currentRole === 'admin' && in_array($module, ['Pengguna', 'Kategori & alat'], true))
-                                || ($currentRole === 'petugas' && in_array($module, ['Persetujuan', 'Pengembalian'], true))
-                                || ($currentRole === 'peminjam' && in_array($module, ['Katalog alat', 'Peminjaman saya', 'Pengembalian'], true));
-                            ?>
-                            <span class="badge badge-sm whitespace-nowrap <?= $moduleReady ? 'border-green-200 bg-green-50 text-green-800' : 'badge-ghost' ?>"><?= $moduleReady ? 'Tersedia' : 'Belum tersedia' ?></span>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
             </div>
         </article>
 

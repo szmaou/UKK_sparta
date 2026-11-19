@@ -175,7 +175,7 @@ ob_start();
                     <?php endforeach; ?>
                 </select>
                 <p id="kondisi-help" class="mt-1 text-xs text-slate-500">
-                    Catatan kondisi fisik untuk arsip riwayat inventaris. Stok alat akan tetap dipulihkan secara penuh ke gudang.
+                    Hanya kondisi <strong>Baik</strong> yang mengembalikan stok ke gudang. Alat rusak atau hilang tidak menambah stok tersedia.
                 </p>
                 <?php if (isset($errors['kondisi'])): ?>
                     <p id="kondisi-error" class="mt-1 text-xs text-rose-600 font-medium">
@@ -191,8 +191,11 @@ ob_start();
                     <div class="text-xs text-slate-700 leading-relaxed">
                         <p class="font-bold text-slate-900">Ketentuan Pemulihan Stok &amp; Denda:</p>
                         <ul class="list-disc list-inside mt-1 space-y-1">
-                            <li>Stok gudang untuk <strong><?= e($alatNama) ?></strong> akan otomatis bertambah <strong>+<?= e((string) $jumlah) ?> unit</strong> saat verifikasi berhasil disimpan.</li>
-                            <li>Tarif denda keterlambatan saat ini adalah <strong>Rp 0 (Bebas Denda)</strong> sebagai tarif bawaan MVP. Nilai denda dihitung otomatis oleh sistem dan tidak dapat diubah secara manual.</li>
+                            <li>Stok gudang <strong><?= e($alatNama) ?></strong> bertambah <strong>+<?= e((string) $jumlah) ?> unit</strong> hanya bila kondisi <strong>Baik</strong>. Kondisi rusak atau hilang tidak menambah stok tersedia.</li>
+                            <li>Tarif denda keterlambatan saat ini adalah
+                                <strong><?= $tarifDenda > 0 ? 'Rp ' . e(number_format($tarifDenda, 0, ',', '.')) . ' per hari per unit' : 'Rp 0 (Bebas Denda)' ?></strong>.
+                                Denda dihitung otomatis dari hari terlambat &times; jumlah unit &times; tarif, dan tidak dapat diubah manual.
+                                Tarif dikelola Admin di halaman Pengaturan.</li>
                         </ul>
                     </div>
                 </div>
@@ -202,7 +205,7 @@ ob_start();
                 <a href="/petugas/pengembalian" class="btn btn-ghost">Batal</a>
                 <button type="submit" class="btn btn-primary">
                     <span class="app-icon" aria-hidden="true"><?= icon('check') ?></span>
-                    Simpan &amp; Pulihkan Stok (+<?= e((string) $jumlah) ?>)
+                    Simpan Verifikasi
                 </button>
             </div>
         </div>

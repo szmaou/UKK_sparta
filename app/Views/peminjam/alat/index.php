@@ -116,8 +116,18 @@ ob_start();
                         $isAvailable = $stokTersedia > 0;
                         $itemId = (string) ($item['id'] ?? '');
                         $deskripsi = trim((string) ($item['deskripsi'] ?? ''));
+                        $foto = trim((string) ($item['foto'] ?? ''));
                         ?>
                         <article class="card flex flex-col justify-between border border-base-300 bg-base-100 shadow-xs transition hover:border-indigo-300 hover:shadow-md">
+                            <?php if ($foto !== ''): ?>
+                                <figure class="aspect-[4/3] overflow-hidden border-b border-base-200 bg-base-200/40">
+                                    <img src="/uploads/alat/<?= rawurlencode($foto) ?>" alt="Foto <?= e((string) ($item['nama'] ?? 'alat')) ?>" class="h-full w-full object-cover" loading="lazy">
+                                </figure>
+                            <?php else: ?>
+                                <figure class="grid aspect-[4/3] place-items-center border-b border-base-200 bg-base-200/60 text-slate-400" aria-hidden="true">
+                                    <span class="app-icon scale-150"><?= icon('image') ?></span>
+                                </figure>
+                            <?php endif; ?>
                             <div class="card-body p-5">
                                 <div class="flex items-start justify-between gap-3">
                                     <span class="badge badge-sm border-indigo-200 bg-indigo-50 font-medium text-indigo-800">

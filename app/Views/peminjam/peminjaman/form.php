@@ -16,6 +16,7 @@ $alatId = (string) ($values['alat_id'] ?? $alat['id'] ?? '');
 $alatNama = (string) ($alat['nama'] ?? 'Alat');
 $alatKode = (string) ($alat['kode'] ?? '—');
 $stokTersedia = (int) ($alat['stok_tersedia'] ?? 0);
+$alatFoto = trim((string) ($alat['foto'] ?? ''));
 
 $today = date('Y-m-d');
 $defaultDue = date('Y-m-d', strtotime('+3 days'));
@@ -49,9 +50,16 @@ ob_start();
     <div class="card border border-indigo-100 bg-indigo-50/50 shadow-xs">
         <div class="card-body p-5">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <span class="font-mono text-xs font-semibold text-indigo-700"><?= e($alatKode) ?></span>
-                    <h3 class="text-xl font-bold text-slate-900"><?= e($alatNama) ?></h3>
+                <div class="flex items-center gap-4">
+                    <?php if ($alatFoto !== ''): ?>
+                        <img src="/uploads/alat/<?= rawurlencode($alatFoto) ?>" alt="Foto <?= e($alatNama) ?>" class="h-20 w-20 shrink-0 rounded-xl border border-indigo-100 bg-white object-cover">
+                    <?php else: ?>
+                        <span class="app-icon grid h-20 w-20 shrink-0 place-items-center rounded-xl border border-indigo-100 bg-white text-indigo-300" aria-hidden="true"><?= icon('image') ?></span>
+                    <?php endif; ?>
+                    <div>
+                        <span class="font-mono text-xs font-semibold text-indigo-700"><?= e($alatKode) ?></span>
+                        <h3 class="text-xl font-bold text-slate-900"><?= e($alatNama) ?></h3>
+                    </div>
                 </div>
                 <div class="rounded-xl border border-indigo-200 bg-white px-4 py-2 text-right">
                     <p class="text-xs text-slate-500">Stok Tersedia Saat Ini</p>

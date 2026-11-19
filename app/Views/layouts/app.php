@@ -26,15 +26,16 @@ $menus = [
         ['users', 'Pengguna', '/admin/users', 'pengguna'],
         ['tags', 'Kategori', '/admin/kategori', 'kategori'],
         ['wrench', 'Alat', '/admin/alat', 'alat'],
-        ['clipboard-list', 'Peminjaman', null, 'peminjaman'],
-        ['refresh-cw', 'Pengembalian', null, 'pengembalian'],
-        ['logs', 'Log Aktivitas', null, 'log'],
+        ['clipboard-list', 'Peminjaman', '/admin/peminjaman', 'peminjaman'],
+        ['refresh-cw', 'Pengembalian', '/admin/pengembalian', 'pengembalian'],
+        ['logs', 'Log Aktivitas', '/admin/activity-logs', 'log'],
+        ['sliders-horizontal', 'Pengaturan', '/admin/pengaturan', 'pengaturan'],
     ],
     'petugas' => [
         ['layout-dashboard', 'Dashboard', '/petugas/dashboard', 'dashboard'],
         ['square-check', 'Persetujuan', '/petugas/persetujuan', 'persetujuan'],
         ['refresh-cw', 'Pengembalian', '/petugas/pengembalian', 'pengembalian'],
-        ['file-text', 'Laporan', null, 'laporan'],
+        ['file-text', 'Laporan', '/petugas/laporan', 'laporan'],
     ],
     'peminjam' => [
         ['layout-dashboard', 'Dashboard', '/peminjam/dashboard', 'dashboard'],
@@ -56,6 +57,7 @@ $navigation = $menus[$currentRole];
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="SPARTA — Sistem Peminjaman Barang dan Alat">
     <title><?= e($pageTitle) ?> · SPARTA</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/img/SMK%20Negeri%201%20Leuwimunding.svg">
     <link rel="stylesheet" href="/assets/css/app.css">
 </head>
 <body class="bg-base-200 text-base-content antialiased">
@@ -92,7 +94,7 @@ $navigation = $menus[$currentRole];
     <div class="drawer-side z-30">
         <button type="button" aria-label="Tutup navigasi" class="drawer-overlay" data-drawer-close></button>
         <aside class="flex min-h-full w-64 flex-col border-r border-base-300 bg-base-100" aria-label="Panel navigasi">
-            <div class="flex h-20 items-center gap-3 border-b border-base-300 px-5">
+            <div class="flex h-16 items-center gap-3 border-b border-base-300 px-5">
                 <img class="logo-school h-12 w-auto" src="/assets/img/SMK%20Negeri%201%20Leuwimunding.svg" alt="Logo SMK Negeri 1 Leuwimunding">
                 <div>
                     <p class="text-xl font-black tracking-tight text-indigo-700">SPARTA</p>

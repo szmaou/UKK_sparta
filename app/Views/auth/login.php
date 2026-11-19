@@ -10,6 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Masuk ke SPARTA — Sistem Peminjaman Barang dan Alat">
     <title>Masuk · SPARTA</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/img/SMK%20Negeri%201%20Leuwimunding.svg">
     <link rel="stylesheet" href="/assets/css/app.css">
 </head>
 <body class="min-h-screen bg-base-200 text-base-content antialiased">
