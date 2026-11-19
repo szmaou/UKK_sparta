@@ -325,6 +325,16 @@ try {
     check('own history shows request and success flash', $history['status'] === 200
         && str_contains($history['body'], (string) $row['kode'])
         && str_contains($history['body'], 'berhasil dikirim'));
+    // --- reject quantity above currently available stock -------------------
+    $countBeforeExcess = (int) dbValue($db, 'SELECT COUNT(*) FROM peminjaman WHERE user_id = ?', [$user1]);
+    $stockBeforeExcess = (int) dbValue($db, 'SELECT stok_tersedia FROM alat WHERE id = ?', [$alat['A1']]);
+    $excess = request($base, 'POST', '/peminjam/peminjaman/create',
+        ['jumlah' => '6'] + $valid, $jar1);
+    check('quantity above available stock is rejected with stock message', $excess['status'] === 422
+        && str_contains($excess['body'], 'Jumlah melebihi stok tersedia saat ini (5 unit)'));
+    check('excess quantity creates no loan or stock change',
+        (int) dbValue($db, 'SELECT COUNT(*) FROM peminjaman WHERE user_id = ?', [$user1]) === $countBeforeExcess
+        && (int) dbValue($db, 'SELECT stok_tersedia FROM alat WHERE id = ?', [$alat['A1']]) === $stockBeforeExcess);
 
     // --- validation ---------------------------------------------------------
     $before = (int) dbValue($db, 'SELECT COUNT(*) FROM peminjaman WHERE user_id = ?', [$user1]);
